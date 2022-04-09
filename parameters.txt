@@ -1,0 +1,84 @@
+#///////////////////////////////////////////////////////////////////////////////////////////////////////////
+#
+# This file contains object parameters to build impeller model with impeller3D.py
+#
+# Usage:  Put this file inside the directory where impellr3D.py resides
+#
+# Syntax: (DATA TYPE) (OBJECT PARAMETER NAME) = (VALUE)
+#
+#	Supported DATA TYPE - float(float), int(int), float vector(fvec), int vector(ivec), boolean(bool)
+#	Supported OBJECT PARAMETER NAME - Please see impeller3D.Meridional/ModelofBlade3D/Blades
+#
+#////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+### V ariables from Script #1 
+float ds = 90
+# Diameter of an impeller
+float D2 = 1120
+# Diameter of a hub
+float d0 = 110
+# Suction diameter
+float D0 = 1000
+# Width of a outlet
+float b2 = 250
+# Length
+float L = 400
+# Type of blades
+bool CylindricalBlades = False
+# Place of a leading edge, % (shroud)
+int LePositionShroud = 30
+# Place of a leading edge, % (hub)
+int LePositionHub = 60
+# Place of a leading edge, % (average)
+int LePositionAverage = 40
+
+
+
+### Variables from Script #2
+# Angles of a shroud streamline (inlet)
+float AngleBeta1Shroud = 15
+# Angles of a shroud streamline (outlet)
+float AngleBeta2Shroud = 25
+fvec AngleBetaPoint1Shroud = (40,20,0)
+fvec AngleBetaPoint2Shroud = (75,40,0)
+bool AnglesChartShroud = False
+float AngleBeta1Hub = 32
+float AngleBeta2Hub = 25
+fvec AngleBetaPoint1Hub = (40,29,0)
+fvec AngleBetaPoint2Hub = (75.0, 27, 0.0)
+bool AnglesChartHub = False
+float AngleBeta1Ave = 26
+float AngleBeta2Ave = 25
+fvec AngleBetaPoint1Ave = (40,25.5,0)
+fvec AngleBetaPoint2Ave = (75,25,0)
+bool AnglesChartAverage = False
+int N = 1000
+
+
+
+### Variables from Script #3
+float ThicknessLEShroud = 21.4
+fvec ThicknessPoint1Shroud = (59, 21.4, 0)
+fvec ThicknessPoint2Shroud = (75, 21.4, 0)
+float ThicknessLEHub = 21.4
+fvec ThicknessPoint1Hub = (40, 30, 0)
+fvec ThicknessPoint2Hub = (75, 21.4, 0)
+float ThicknessTEHub = 21.4
+float ThicknessLEAve = 21.4
+fvec ThicknessPoint1Ave = (40.0, 30.0, 0.0)
+fvec ThicknessPoint2Ave = (75, 21.4, 0)
+float ThicknessTEAve = 21.4
+float ThicknessTEShroud = 21.4
+bool TraillingEdgeEllipse = False
+int TraillingEdgeType = 2
+int LeadingEdgeType = 1
+int NumberOfBlades = 8
+bool FullDomainCFD = False
+bool PeriodicDomainCFD = False
+float HalfD3toD2 = 1.2
+float ThicknessShroud = 21.4
+float ThicknessHub = 21.4
+float ShaftLength = 100
+
+######### below are added by impeller3D.py while running FreeCADGui ############
+

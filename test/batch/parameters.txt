@@ -1,0 +1,106 @@
+#///////////////////////////////////////////////////////////////////////////////////////////////////////////
+#
+# This file contains object parameters to build impeller model with 1_0_impeller.py
+#
+# Usage:  Put this file inside the directory where 1_0_impeller.py resides
+#
+# Syntax: (DATA TYPE) (OBJECT PARAMETER NAME) = (VALUE)
+#
+#	Supported DATA TYPE - float(float), int(int), float vector(fvec), int vector(ivec), boolean(bool)
+#	Supported OBJECT PARAMETER NAME - Please see 1_0_impeller.Meridional/ModelofBlade3D/Blades
+#
+#////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+### Variables from Script #1
+# Diameter of an impeller [mm]
+float D2 = 1070
+# Diameter of a hub [mm]
+float d0 = 100
+# Diameter of a shaft [mm]
+float ds = 80
+# Suction diameter [mm]
+float D0 = 850
+# Width of a outlet [mm]
+float b2 = 250
+# Length [mm]
+float L = 300
+# Thickness of Shroud [mm] (Not available)
+float ThicknessShroud = 13
+# Thickness of Hub [mm]
+float ThicknessHub = 13
+
+# Type of blades
+bool CylindricalBlades = False
+# Place of a leading edge, % (shroud)
+int LePositionShroud = 15
+# Place of a leading edge, % (hub)
+int LePositionHub = 55
+# Place of a leading edge, % (average)
+int LePositionAverage = 40
+
+
+
+### Variables from Script #2
+# Beta Angles of a shroud streamline [deg]
+float AngleBeta1Shroud = 15
+float AngleBeta2Shroud = 25
+# Beta Angles of a shroud streamline [(%, deg, 0)]
+fvec AngleBetaPoint1Shroud = (40,18,0)
+fvec AngleBetaPoint2Shroud = (75,22.5,0)
+bool AnglesChartShroud = False
+
+# Beta Angles of a hub streamline [deg]
+float AngleBeta1Hub = 15
+float AngleBeta2Hub = 25
+# Beta Angles of a hub streamline [(%, deg, 0)]
+fvec AngleBetaPoint1Hub = (40,18,0)
+fvec AngleBetaPoint2Hub = (75.0, 22.5, 0.0)
+bool AnglesChartHub = False
+
+# Beta Angles of a average streamline [deg]
+float AngleBeta1Ave = 15
+float AngleBeta2Ave = 25
+# Beta Angles of a average streamline [(%, deg, 0)]
+fvec AngleBetaPoint1Ave = (40,18,0)
+fvec AngleBetaPoint2Ave = (75,22.5,0)
+bool AnglesChartAverage = False
+
+# Number of Calculation Points of Beta Angle
+int N = 1000
+
+
+
+### Variables from Script #3
+# Blade Thickness for Shroud [mm]
+float ThicknessLEShroud = 21.4
+float ThicknessTEShroud = 21.4
+# Blade Thickness for Shroud [(%, mm, 0)]
+fvec ThicknessPoint1Shroud = (40, 21.4, 0)
+fvec ThicknessPoint2Shroud = (75, 21.4, 0)
+
+# Blade Thickness for Hub [mm]
+float ThicknessLEHub = 21.4
+float ThicknessTEHub = 21.4
+# Blade Thickness for Hub [(%, mm, 0)]
+fvec ThicknessPoint1Hub = (40, 21.4, 0)
+fvec ThicknessPoint2Hub = (75, 21.4, 0)
+
+# Blade Thickness for Average [mm]
+float ThicknessLEAve = 21.4
+float ThicknessTEAve = 21.4
+# Blade Thickness for Average [(%, mm, 0)]
+fvec ThicknessPoint1Ave = (40.0, 21.4, 0.0)
+fvec ThicknessPoint2Ave = (75, 21.4, 0)
+
+### Variables for Shape of Edges
+bool TraillingEdgeEllipse = False
+int LeadingEdgeType = 1
+int TraillingEdgeType = 1
+
+int NumberOfBlades = 7
+
+### Variables for CFD Model
+bool FullDomainCFD = False
+bool PeriodicDomainCFD = False
+float HalfD3toD2 = 1.2
+

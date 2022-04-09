@@ -1,0 +1,14 @@
+class Meridional
+	1. shroud와 hub의 surface를 정의하기 위한 meridional 생성 -> Quadratic Bezier Curve로
+	2. hub와 shroud의 meridional을 잇는 inlet1, 2 / outlet1, 2 생성 -> Line segment
+	3. 두 meridional의 average curve 생성
+	4. shroud의 meridional을 LePositionShroud, hub의 meridional을 LePositionHub, ave. curve를 LePostionAve로 자름
+	5. 자른 세(shroud, average, hub) 기준점으로 LeCurve 생성 및 반으로 나눔
+	6. LePosition들을 기준으로, discretization 한 bezier curve meridional point를 각 두 개의(shroud1, shroud2 / ave1, ave2 / hub1, hub2) B-spline으로 interpolate
+	7. Part.Wire로 curve들 visualization
+	8. ShroudSurface = shroud.toShape().revolve
+	9. HubSurface = hub.toShape().revolve
+	10. obj.Shape = Part.Compound([아까 만든 wire, ShroudSurface, HubSurface])
+
+class ModelOfBlade3D
+	1. 

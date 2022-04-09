@@ -1,0 +1,13 @@
+### Parameters for FreeCAD Modeling of FEM domain
+# Width of a beam
+float W = 200
+# Height of a beam
+float H = 800
+# Length of a beam
+float L = 10000
+
+
+### Material Properties
+matprop float E = 210e3,.3
+matprop float rho = 7.8e-9
+
