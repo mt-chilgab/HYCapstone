@@ -77,9 +77,16 @@ def maxVonMises(p):
         f.close()
 
     vonMisesList=[]
-    for i in range(1,len(stress_list)):
-        a=(1/math.sqrt(2))*((float(stress_list[i][0])-float(stress_list[i][1])) ** 2+(float(stress_list[i][1])-float(stress_list[i][2])) ** 2+(float(stress_list[i][2])-float(stress_list[i][0])) ** 2+6*((float(stress_list[i][3])) ** 2+(float(stress_list[i][4])) ** 2+(float(stress_list[i][5])) ** 2)) ** 0.5
-        vonMisesList.append(a)
+    #for i in range(1,len(stress_list)):
+    #    a=(1/math.sqrt(2))*((float(stress_list[i][0])-float(stress_list[i][1])) ** 2+(float(stress_list[i][1])-float(stress_list[i][2])) ** 2+(float(stress_list[i][2])-float(stress_list[i][0])) ** 2+6*((float(stress_list[i][3])) ** 2+(float(stress_list[i][4])) ** 2+(float(stress_list[i][5])) ** 2)) ** 0.5
+    #    vonMisesList.append(a)
+
+    for stressVector in stress_list:
+        stressVector = list(map(lambda s: float(s), stressVector))
+        stressVector[0:3] = [math.pow(normalStress-sum(stressVector[0:3])/3, 2) for normalStress in stressVector[0:3]]
+        stressVector[3:6] = [math.pow(shearStress, 2)*2 for shearStress in stressVector[3:6]]
+        vonMisesList.append(math.sqrt(3*sum(stressVector)/2))
+   
     maxVM = max(vonMisesList)
     vonMisesList = [math.pow(s/maxVM, p) for s in vonMisesList]
 
