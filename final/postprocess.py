@@ -3,6 +3,8 @@ from io import StringIO
 from contextlib import contextmanager
 
 import re, math
+import itertools
+
 
 
 @contextmanager
@@ -57,11 +59,12 @@ def frdManipulation():
         f.close()
 
 
+
+
 # Approximate Maximum von Mises Stress with p-Norm: Considering Computational Instability
 # p = 10
 def maxVonMises(p):
     stress_list = []
-
     with open(os.getcwd()+u"\\stress.frd", mode='r', encoding='UTF-8') as f:
         lines = f.readlines()
         for line in lines:
@@ -76,26 +79,31 @@ def maxVonMises(p):
                 stress_list.append(vlist)
         f.close()
 
-    vonMisesList=[]
-    #for i in range(1,len(stress_list)):
-    #    a=(1/math.sqrt(2))*((float(stress_list[i][0])-float(stress_list[i][1])) ** 2+(float(stress_list[i][1])-float(stress_list[i][2])) ** 2+(float(stress_list[i][2])-float(stress_list[i][0])) ** 2+6*((float(stress_list[i][3])) ** 2+(float(stress_list[i][4])) ** 2+(float(stress_list[i][5])) ** 2)) ** 0.5
-    #    vonMisesList.append(a)
+    hjVonMisesList=[]
+    jhVonMisesList=[]
+    for i in range(1,len(stress_list)):
+        a=(1/math.sqrt(2))*math.sqrt(math.pow(float(stress_list[i][0])-float(stress_list[i][1]), 2)+math.pow(float(stress_list[i][1])-float(stress_list[i][2]), 2)+math.pow(float(stress_list[i][2])-float(stress_list[i][0]), 2)+6*(math.pow(float(stress_list[i][3]),2)+math.pow(float(stress_list[i][4]),2)+math.pow(float(stress_list[i][5]),2)))
+        hjVonMisesList.append(a)
 
     for stressVector in stress_list:
         stressVector = list(map(lambda s: float(s), stressVector))
-        stressVector[0:3] = [math.pow(normalStress-sum(stressVector[0:3])/3, 2) for normalStress in stressVector[0:3]]
-        stressVector[3:6] = [math.pow(shearStress, 2)*2 for shearStress in stressVector[3:6]]
-        vonMisesList.append(math.sqrt(3*sum(stressVector)/2))
-   
-    maxVM = max(vonMisesList)
-    vonMisesList = [math.pow(s/maxVM, p) for s in vonMisesList]
+        diagonalAverage = sum(stressVector[0:3])/3
+        stressVector[0:3] = [ math.pow(normalStress-diagonalAverage, 2) for normalStress in stressVector[0:3] ]
+        stressVector[3:6] = [ math.pow(shearStress, 2)*2 for shearStress in stressVector[3:6] ] 
+        jhVonMisesList.append(math.sqrt(3*sum(stressVector)/2))
+    
+    hjMaxVM = max(hjVonMisesList)
+    jhMaxVM = max(jhVonMisesList)
+    
+    hjVonMisesList = [ math.pow(stress/hjMaxVM, p) for stress in hjVonMisesList ]
+    jhVonMisesList = [ math.pow(stress/jhMaxVM, p) for stress in jhVonMisesList ]
+    
+    with open(os.getcwd()+u"\\comparison.txt", "a") as f:
+        f.writelines("hj, jh: "+str(hjMaxVM*math.pow(sum(hjVonMisesList), 1/p))+"   "+str(jhMaxVM*math.pow(sum(jhVonMisesList), 1/p))+"\n")
+        f.close
 
-    pNorm = 0
-    for i in range(len(vonMisesList)):
-        pNorm += vonMisesList[i]
-    pNorm = maxVM*math.pow(pNorm, 1/p)
+    return jhMaxVM*math.pow(sum(jhVonMisesList), 1/p)
 
-    return pNorm
 
 
 if __name__ == "__main__":
@@ -103,4 +111,4 @@ if __name__ == "__main__":
     with silenceStdout():
         frdManipulation()
 
-    print(maxVonMises(10)) 
+    print(float(maxVonMises(10)))

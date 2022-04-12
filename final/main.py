@@ -1,7 +1,10 @@
-# Opening FreeCAD LoadNew.py / Iteration toolkit for property reading and binding
+# Loading another python scripts(subprocess) and iteration toolkit for property reading and binding (itertools)
+# Logging feature for undisplayed exceptions(logging)
 import os, sys, re
 import subprocess
 import itertools as it
+import logging
+logging.basicConfig(filename=os.getcwd()+u"\\log", level=logging.DEBUG)
 
 # Import FreeCAD related modules
 import FreeCAD, FreeCADGui, Part
@@ -14,9 +17,10 @@ from pyKriging.samplingplan import samplingplan
 from pyKriging.krige import kriging
 #from pyKriging.CrossValidation import Cross_Validation
 
+# Plotting(matplotlib, mpl_toolkits) and logging
 from sty import fg, bg, ef, rs
-import logging
-logging.basicConfig(filename=os.getcwd()+u"\\log", level=logging.DEBUG)
+import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
 
 
 
@@ -198,7 +202,7 @@ def translatePredictionToMatlab(dvNameList, sampleValueVector, k):
     return str(k.mu)+"+"+"+".join(basisList)
 
 def translatePrediction(pointsList, sampleValueVector, k):
-    k.updateData()
+    k.updateData() 
     k.updatePsi()
     
     # As sample points on kriging instance are normalized, we should de-normalized it.
@@ -217,7 +221,7 @@ def translatePrediction(pointsList, sampleValueVector, k):
     
     resultValueList = []
     for point in pointsList:
-        resultValue = 0
+        resultValue = 0 
         for i in range(samplePoints.shape[0]):
             basisExponentValue = 0
             for (j, theta, p) in zip(range(samplePoints.shape[1]), thetaList, pList):
@@ -227,10 +231,92 @@ def translatePrediction(pointsList, sampleValueVector, k):
 
     return resultValueList
 
+def matlabPlot():
+    string = []
+    string.append('x1=100:1:200;\n')
+    string.append('x2=100:1:200;\n\n')
+    string.append('s = 101;\n')
+    string.append('for i = 1:s\n')
+    string.append('\tfor j = 1:s\n')
+    string.append('\t\tx = x1(1,i);\n')
+    string.append('\t\ty = x2(1,j);\n')
+    string.append('\t\tf(j,i) = ')
+    string.append(str(translatePredictionToMatlab(["x", "y"], np.array(constraintFuncValue), krig)))
+    string.append(';\n')
+    string.append('\tend\n')
+    string.append('end\n\n')
+    string.append('surf(x1,x2,f)\n\n')
+    string.append('hold on\n\n')
+    string.append(r'[X,Y] = readvars("valueset.txt");'+'\n')
+    string.append(r'[a,b,c,Z] = readvars("objlist.txt");'+'\n\n')
+    string.append(r'scatter3(X,Y,Z,"filled","MarkerFaceColor","r");')
+
+    with open('testplot.m','w',encoding='UTF-8') as f:
+        for line in string:
+            f.write(line)
+
+def printsampleList():
+    str_list = []
+    for i in range(math.floor(m)):
+        mapped_line = sampleList[i]
+        str_line = []
+        for j in range(ndv):
+            str_line.append(format(mapped_line[j],'>15,.6E'))
+        str_line2 = ''.join(str_line)+'\n'
+        str_list.append(str_line2)
+    str_list[-1]=str_list[-1][:-1]
+
+    with open('valueset.txt','w',encoding='UTF-8') as f:
+        for value in str_list:
+            f.write(value)
+
+def printobjList():
+    str_list = []
+    for i in range(math.floor(m)):
+        obj_line = constraintFuncValue[i]
+        str_line = []
+        str_line.append(format(obj_line,'>15,.6E'))
+        str_line2 = ''.join(str_line)+'\n'
+        str_list.append(str_line2)
+    str_list[-1]=str_list[-1][:-1]
+
+    with open('objlist.txt','w',encoding='UTF-8') as f:
+        for value in str_list:
+            f.write(value)
+
+# Plots Kriging prediction in 3D surface plot. Select two design variables from DVGroupList with dvIndex1, dvIndex2
+# and then assign values for another design variables with anotherDVs
+def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValueVector, k):
+    if dvIndex1 > dvIndex2:
+        dvIndex1, dvIndex2 = dvIndex2, dvIndex1
+
+    if len(anotherDVs)+2 == len(DVGroupList):
+        dv1 = np.linspace(DVGroupList[dvIndex1].domainLB, DVGroupList[dvIndex1].domainUB, div).tolist()
+        dv2 = np.linspace(DVGroupList[dvIndex2].domainLB, DVGroupList[dvIndex2].domainUB, div).tolist()
+        
+        ptsList = list(it.product(dv1, dv2))
+        if len(anotherDVs) > 0:
+            ptsList = [ anotherDVs[0:dvIndex1]+[pt[0]]+anotherDVs[dvIndex1:dvIndex2-1]+[pt[1]]+anotherDVs[dvIndex2-1:] for pt in ptsList ]
+        pred = np.array(translatePrediction(ptsList, sampleValueVector, k))
+    
+        dv1, dv2 = np.meshgrid(np.array(dv1), np.array(dv2))
+        pred = np.reshape(pred, (div, div))
+
+        fig = plt.figure(figsize = (14, 9))
+        ax = plt.axes(projection = '3d')
+        myCmap = plt.get_cmap('plasma')
+        surf = ax.plot_surface(dv1, dv2, pred, cmap = myCmap, edgecolor = 'none')
+        fig.colorbar(surf, ax = ax, shrink = 0.5, aspect = 5)
+        ax.set_title('Kriging Prediction')
+
+        plt.show()
+
+    else:
+        return
 
 
 if __name__ == "__main__":
-    FCPath = #@FCPath Placeholder
+    FCPath = u'C:\\Users\\Grant\\AppData\\Local\\Programs\\FreeCAD 0.19'
 
     try:
         FreeCADGui.showMainWindow()
@@ -252,7 +338,7 @@ if __name__ == "__main__":
 
 
         # Design Variable Grouping
-        m = 20
+        m = 5
         ndv = 2
         includeEdge = 0
         WGroup = DVGroup(["W"], 10, 1000, m, includeEdge)
@@ -284,13 +370,17 @@ if __name__ == "__main__":
         print("\nOptimal LHS Result:\n", sampleList)
 
         # Experiment with points calculated from OLHS
-        def experiment(DVGroupList, denormalizedSampleList):
+        def experiment(DVGroupList, denormalizedSampleList, expNum=None):
             objectiveFuncValue = []
             constraintFuncValue = []
             
             print("\n")
             for exp in denormalizedSampleList:
-                print(fg.red+"Experiment #"+str(denormalizedSampleList.index(exp)+1)+fg.rs)
+                if expNum is None:
+                    print(fg.red+"Experiment #"+str(denormalizedSampleList.index(exp)+1)+fg.rs)
+                elif type(expNum).__name__ == 'int':
+                    print(fg.red+"Experiment #"+str(expNum)+fg.rs)
+
                 print("Binding value for experiment #"+str(denormalizedSampleList.index(exp)+1))
 
                 for i in range(len(DVGroupList)):
@@ -342,7 +432,7 @@ if __name__ == "__main__":
         for i in range(infillNum):
             newPts = krig.infill(1).tolist()
             for pt in newPts:
-                infillConstraintFuncValue = experiment(DVGroupList, newPts)[1]
+                infillConstraintFuncValue = experiment(DVGroupList, newPts, i+1)[1]
                 constraintFuncValue = constraintFuncValue + infillConstraintFuncValue
                 krig.addPoint(pt, infillConstraintFuncValue)
                 sampleList.append(pt)
@@ -359,6 +449,11 @@ if __name__ == "__main__":
         print("\n\nConstraint function values acquired with FEA: \n"+str(constraintFuncValue))
         print("\n\nConstraint function values estimated with Kriging: \n"+str(predictedResult))
         print("\n\nR^2 = "+str(krig.rsquared(np.array(constraintFuncValue), np.array(predictedResult))))
+
+        matlabPlot()
+        printsampleList()
+        printobjList()
+        plotPrediction(DVGroupList, 0, 1, [], 100, np.array(constraintFuncValue), krig)
 
     except Exception as e:
         logging.info(e)
