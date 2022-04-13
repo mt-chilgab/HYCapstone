@@ -298,15 +298,24 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
         if len(anotherDVs) > 0:
             ptsList = [ anotherDVs[0:dvIndex1]+[pt[0]]+anotherDVs[dvIndex1:dvIndex2-1]+[pt[1]]+anotherDVs[dvIndex2-1:] for pt in ptsList ]
         pred = np.array(translatePrediction(ptsList, sampleValueVector, k))
-    
+        
+        samplePts = np.zeros((k.X.shape[0], 2))
+        for i in range(k.X.shape[0]):
+            samplePtList = k.inversenormX(k.X[i]).tolist()
+            samplePts[i] = np.array([samplePtList[dvIndex1], samplePtList[dvIndex2]])
+        samplePts = samplePts.T
+        
         dv1, dv2 = np.meshgrid(np.array(dv1), np.array(dv2))
         pred = np.reshape(pred, (div, div))
 
         fig = plt.figure(figsize = (14, 9))
         ax = plt.axes(projection = '3d')
         myCmap = plt.get_cmap('plasma')
-        surf = ax.plot_surface(dv1, dv2, pred, cmap = myCmap, edgecolor = 'none')
-        fig.colorbar(surf, ax = ax, shrink = 0.5, aspect = 5)
+
+        surf = ax.plot_surface(dv1, dv2, pred, cmap=myCmap, edgecolor='none')
+        scatter = ax.scatter(samplePts[0], samplePts[1], sampleValueVector, marker='x', s=100, c='white')
+
+        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
         ax.set_title('Kriging Prediction')
 
         plt.show()
@@ -316,7 +325,7 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
 
 
 if __name__ == "__main__":
-    FCPath = u'C:\\Users\\Grant\\AppData\\Local\\Programs\\FreeCAD 0.19'
+    FCPath = #@FCPath Placeholder
 
     try:
         FreeCADGui.showMainWindow()
@@ -338,7 +347,7 @@ if __name__ == "__main__":
 
 
         # Design Variable Grouping
-        m = 5
+        m = 20
         ndv = 2
         includeEdge = 0
         WGroup = DVGroup(["W"], 10, 1000, m, includeEdge)
@@ -398,7 +407,7 @@ if __name__ == "__main__":
                 print("Step export ok")
 
                 preprocExec = subprocess.Popen([sys.executable, os.getcwd()+u"\\preprocess.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)         
-                preprocSTDOUT, preprocSTDERR = preprocExec.communicate()
+                preprocSTDOUT, preprocSTDERR = preprocExec.communicate() 
                 #print("!"+preprocSTDOUT.decode('UTF-8')+"\n!!"+preprocSTDERR.decode('UTF-8'))
 
                 ccxDir = os.getcwd()+u"\\ccx\\etc"
@@ -408,6 +417,7 @@ if __name__ == "__main__":
 
                 postprocExec = subprocess.Popen([sys.executable, os.getcwd()+u"\\postprocess.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 postprocSTDOUT, postprocSTDERR = postprocExec.communicate()
+                os.system(u"powershell.exe "+os.getcwd()+u"\\scripts\\caseSaver.ps1 "+str(exp[0])+"_"+str(exp[1]))
                 #print("!"+postprocSTDOUT.decode('UTF-8')+"\n!!"+postprocSTDERR.decode('UTF-8'))
 
                 constraintFuncValue.append(float(postprocSTDOUT.decode('UTF-8').strip('\r\n')))

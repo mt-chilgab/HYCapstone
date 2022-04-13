@@ -175,5 +175,7 @@ def inpManipulation():
 
 
 if __name__ == "__main__":
+    os.system("powershell.exe "+os.getcwd()+u"\\script\\clean.ps1")
     runGmsh()
     inpManipulation()
+
