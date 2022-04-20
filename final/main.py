@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pyKriging.samplingplan import samplingplan
 from pyKriging.krige import kriging
+from sklearn.covariance import EllipticEnvelope
 #from pyKriging.CrossValidation import Cross_Validation
 
 # Plotting(matplotlib, mpl_toolkits) and logging
@@ -179,6 +180,7 @@ def translatePredictionToMatlab(dvNameList, sampleValueVector, k):
     scalingFactorList = np.zeros(k.X.shape[1])
     for i in range(samplePoints.shape[0]):
         samplePoints[i] = k.inversenormX(k.X[i])
+        print("matlab prediction sample point "+str(i)+": ", samplePoints[i])
 
     for i in range(samplePoints.shape[1]):
         scalingFactorList[i] = k.normRange[i][1]-k.normRange[i][0]
@@ -298,22 +300,28 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
         if len(anotherDVs) > 0:
             ptsList = [ anotherDVs[0:dvIndex1]+[pt[0]]+anotherDVs[dvIndex1:dvIndex2-1]+[pt[1]]+anotherDVs[dvIndex2-1:] for pt in ptsList ]
         pred = np.array(translatePrediction(ptsList, sampleValueVector, k))
-        
+       
+        # For scatter plot, extract samplePts including Design Variable 1, 2 values
         samplePts = np.zeros((k.X.shape[0], 2))
         for i in range(k.X.shape[0]):
             samplePtList = k.inversenormX(k.X[i]).tolist()
             samplePts[i] = np.array([samplePtList[dvIndex1], samplePtList[dvIndex2]])
         samplePts = samplePts.T
+        print("samplePts used for scatter(plotPrediction)", samplePts)
         
         dv1, dv2 = np.meshgrid(np.array(dv1), np.array(dv2))
         pred = np.reshape(pred, (div, div))
+        analytic = 1.2*np.power(10, 9)/np.power(dv2,2)/dv1
 
         fig = plt.figure(figsize = (14, 9))
         ax = plt.axes(projection = '3d')
+        ax.set_xlabel('Design Variable 1')
+        ax.set_ylabel('Design Variable 2') 
         myCmap = plt.get_cmap('plasma')
 
         surf = ax.plot_surface(dv1, dv2, pred, cmap=myCmap, edgecolor='none')
-        scatter = ax.scatter(samplePts[0], samplePts[1], sampleValueVector, marker='x', s=100, c='white')
+        surfAnalytic = ax.plot_wireframe(dv1, dv2, analytic, cmap='seismic')
+        scatter = ax.scatter(samplePts[0], samplePts[1], sampleValueVector, marker='x', s=100, c='black')
 
         fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
         ax.set_title('Kriging Prediction')
@@ -325,7 +333,7 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
 
 
 if __name__ == "__main__":
-    FCPath = #@FCPath Placeholder
+    FCPath = u'C:\\Users\\Grant\\AppData\\Local\\Programs\\FreeCAD 0.19'
 
     try:
         FreeCADGui.showMainWindow()
@@ -347,11 +355,11 @@ if __name__ == "__main__":
 
 
         # Design Variable Grouping
-        m = 20
+        m = 10
         ndv = 2
         includeEdge = 0
-        WGroup = DVGroup(["W"], 10, 1000, m, includeEdge)
-        HGroup = DVGroup(["H"], 10, 1000, m, includeEdge)
+        WGroup = DVGroup(["W"], 100, 1000, m, includeEdge)
+        HGroup = DVGroup(["H"], 100, 1000, m, includeEdge)
 
         DVGroupList = [WGroup, HGroup]
         if len(DVGroupList) != ndv:
@@ -387,11 +395,11 @@ if __name__ == "__main__":
             for exp in denormalizedSampleList:
                 if expNum is None:
                     print(fg.red+"Experiment #"+str(denormalizedSampleList.index(exp)+1)+fg.rs)
+                    print("Binding value for experiment #"+str(denormalizedSampleList.index(exp)+1))
                 elif type(expNum).__name__ == 'int':
                     print(fg.red+"Experiment #"+str(expNum)+fg.rs)
-
-                print("Binding value for experiment #"+str(denormalizedSampleList.index(exp)+1))
-
+                    print("Binding value for experiment #"+str(expNum))
+               
                 for i in range(len(DVGroupList)):
                     DVGroupList[i].bindValue(exp[i])  
                     
@@ -431,23 +439,104 @@ if __name__ == "__main__":
         objectiveFuncValue, constraintFuncValue = experiment(DVGroupList, sampleList)
 
 
+        # Outlier Detection with MCD
+        def detectOutliersMCD(sampleList, constraintFuncValue, deleteOutlierPts=True, infill=False, samplePtsBeforeInfill=None):
+            yObserved = np.array(constraintFuncValue)
+            X = np.array(sampleList)
+            
+            augX = np.append(X, np.reshape(yObserved, (yObserved.shape[0],1)), axis=1)
+            print("augX: ", augX)
+
+            outlierDetection = EllipticEnvelope(contamination=0.1)
+            print("\nDetecting Outliers with Minimum Covariance Determinant (MCD): ")
+            yHat = outlierDetection.fit_predict(augX)
+            print("Outliers(-1): ", yHat)
+            mask = yHat != -1
+            
+            # This if statement treats sample points and observation at the point as inlier
+            # so that only infill points can be detected as outlier.
+            # Should decide whether this is backed with statistical theories or not...
+            if infill or samplePtsBeforeInfill is not None:
+                for i in range(samplePtsBeforeInfill):
+                    mask[i] = True
+            if deleteOutlierPts:
+                sampleListInlier, constraintFuncValueInlier = X[mask].tolist(), yObserved[mask].tolist()
+                print("Outlier removed dataset: \n\tsampleList: ", sampleList)
+                print("\tConstraint Func. Value: ", constraintFuncValue)
+
+                return sampleListInlier, constraintFuncValueInlier, mask
+
+            else:
+                return mask
+
+
+        # Simple median-absoulte-deviation(MAD) based 1D outlier detection for checkup
+        def detectOutliersMAD(constraintFuncValue, threshold=3.5):
+            median = np.median(constraintFuncValue, axis=0)
+            diff = np.abs(constraintFuncValue - median*np.ones(constraintFuncValue.shape[0]))
+            mad = np.median(diff)
+            modifiedZScore = 0.6745*diff/mad
+
+            return modifiedZScore > threshold
+
+
+        # Redo experiments 5 times on outlier points
+        outlierMask = detectOutliersMCD(sampleList, constraintFuncValue, deleteOutlierPts=False)
+        for i in range(len(outlierMask)):
+            testObservations = []
+            if not outlierMask[i]:
+                print("Re-doing experiment for detected outlier point: ", sampleList[i])
+                expRep = 7
+
+                for j in range(expRep):
+                    testObservations.append(*experiment(DVGroupList, [sampleList[i]], j+1)[1])
+                testObservations = np.array(testObservations)
+
+                checkupMask = testObservations[detectOutliersMAD(testObservations).tolist()]
+                testObservations = testObservations[checkupMask]
+
+                print("Outlier removed checkup observations: ", testObservations)
+
+                testObservations.append(constraintFuncValue[i])
+                checkupMask = testObservations[detectOutliersMAD(testObservations).tolist()]
+
+                if checkupMask[-1]:
+                    outlierMask[i] = True
+
+        print("rearranged outlier mask: ", outlierMask)
+        sampleList, constraintFuncValue = sampleList[outlierMask], constraintFuncValue[outlierMask]
+                
+                    
         # Kriging the result
         krig = kriging(np.array(sampleList), np.array(constraintFuncValue))
         krig.train()
 
 
-        # Infill points for Kriging
-        infillNum = math.floor(m/4)
+        # Infill points for Kriging + outlier detection with MCD
+        infillNum = 2
+        outilerMask = []
         print("\nExperiments for Infill Points: ")
         for i in range(infillNum):
-            newPts = krig.infill(1).tolist()
-            for pt in newPts:
-                infillConstraintFuncValue = experiment(DVGroupList, newPts, i+1)[1]
-                constraintFuncValue = constraintFuncValue + infillConstraintFuncValue
-                krig.addPoint(pt, infillConstraintFuncValue)
-                sampleList.append(pt)
-            krig.train()
-        
+            # infill criteria are either 'ei' (expected improvement) or 'error' (point of biggest MSE)
+            # and also, remember to set addPoint=False so we can decide whether a infill point and its observation is outlier.
+            newPts = krig.infill(1, method='ei', addPoint=False).tolist()
+
+            sampleNumBeforehand = len(sampleList)
+            sampleList += newPts
+            for j in range(len(newPts)):
+                constraintFuncValue.append(*experiment(DVGroupList, [newPts[j]], 3*i+j+1)[1])
+
+            sampleList, constraintFuncValue, outlierMask = detectOutliersMCD(sampleList, constraintFuncValue, deleteOutlierPts=True, infill=True, samplePtsBeforeInfill=sampleNumBeforehand) 
+            print("outlier removed: ", constraintFuncValue) 
+            for j in range(sampleNumBeforehand, len(sampleList), 1):
+                krig.addPoint(np.array(sampleList[j]), constraintFuncValue[j])
+                krig.train()
+                        
+            print("sampleList: ", sampleList, "\n")
+            print("constFuncValue: ", constraintFuncValue, "\n")
+            print("outlierMask: ", outlierMask, "\n")
+            print("k.X length: ", krig.X.shape[0], "\n")
+            print("k.y length: ", krig.y.shape[0], "\n")
 
         # Cross Validation of the model
 
@@ -460,9 +549,9 @@ if __name__ == "__main__":
         print("\n\nConstraint function values estimated with Kriging: \n"+str(predictedResult))
         print("\n\nR^2 = "+str(krig.rsquared(np.array(constraintFuncValue), np.array(predictedResult))))
 
-        matlabPlot()
-        printsampleList()
-        printobjList()
+        #matlabPlot()
+        #printsampleList()
+        #printobjList()
         plotPrediction(DVGroupList, 0, 1, [], 100, np.array(constraintFuncValue), krig)
 
     except Exception as e:
@@ -471,6 +560,12 @@ if __name__ == "__main__":
     print(fg.red+"\nClear FEA related files? (y/n)"+fg.rs)
     clear = input()
     if clear == 'y' or clear == 'Y':
-        os.system(u"powershell.exe "+os.getcwd()+u"\\scripts\\clean.ps1 12")
+        os.system(u"powershell.exe "+os.getcwd()+u"\\scripts\\clean.ps1 123")
+    
+    print(fg.red+"\nClear txt files(valueset, objlist, comparison)? (y/n)"+fg.rs)
+    clearTxt = input()
+    if clearTxt == 'y' or clearTxt == 'Y':
+        os.system(u"powershell.exe "+os.getcwd()+u"\\scripts\\cleanTxt.ps1")
+    
     exit()
 

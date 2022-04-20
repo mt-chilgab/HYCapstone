@@ -95,14 +95,15 @@ def maxVonMises(p):
     hjMaxVM = max(hjVonMisesList)
     jhMaxVM = max(jhVonMisesList)
     
-    hjVonMisesList = [ math.pow(stress/hjMaxVM, p) for stress in hjVonMisesList ]
-    jhVonMisesList = [ math.pow(stress/jhMaxVM, p) for stress in jhVonMisesList ]
+    #hjVonMisesList = [ math.pow(stress/hjMaxVM, p) for stress in hjVonMisesList ]
+    #jhVonMisesList = [ math.pow(stress/jhMaxVM, p) for stress in jhVonMisesList ]
     
-    with open(os.getcwd()+u"\\comparison.txt", "a") as f:
-        f.writelines("hj, jh: "+str(hjMaxVM*math.pow(sum(hjVonMisesList), 1/p))+"   "+str(jhMaxVM*math.pow(sum(jhVonMisesList), 1/p))+"\n")
-        f.close
+    #with open(os.getcwd()+u"\\comparison.txt", "a") as f:
+    #    f.writelines("hj, jh: "+str(hjMaxVM*math.pow(sum(hjVonMisesList), 1/p))+"   "+str(jhMaxVM*math.pow(sum(jhVonMisesList), 1/p))+"\n")
+    #    f.close
 
-    return jhMaxVM*math.pow(sum(jhVonMisesList), 1/p)
+    #return jhMaxVM*math.pow(sum(jhVonMisesList), 1/p)
+    return jhMaxVM
 
 
 
@@ -111,4 +112,4 @@ if __name__ == "__main__":
     with silenceStdout():
         frdManipulation()
 
-    print(float(maxVonMises(10)))
+    print(float(maxVonMises(30)))

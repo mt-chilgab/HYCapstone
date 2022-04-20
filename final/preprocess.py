@@ -13,7 +13,7 @@ def runGmsh():
     # Load a STEP file (using `importShapes' instead of `merge' allows to directly retrieve the tags of the highest dimensional imported entities):
     path = os.path.dirname(os.path.abspath(__file__))
     gmsh.merge(os.path.join(path, 'gmsh\\box.opt'))
-    v = gmsh.merge(os.path.join(path, 'box.step'))
+    gmsh.merge(os.path.join(path, 'box.step'))
 
     ### 여기서 매쉬 설정 더하려면 t6: Transfinite meshes 참고
     gmsh.model.mesh.generate(3)
@@ -36,12 +36,12 @@ def inpManipulation():
             list_file.append(line)
     f.close()
 
-    found1 = list_file.index('*ELEMENT, type=CPS3, ELSET=Surface5\n')
-    found2 = list_file.index('*ELEMENT, type=CPS3, ELSET=Surface6\n')
-    found3 = list_file.index('*ELEMENT, type=T3D2, ELSET=Line1\n') ### ELEMENT 시작줄
-    found4 = list_file.index('*ELEMENT, type=C3D4, ELSET=Volume1\n') ### Volume Element 시작줄
-    found5 = list_file.index('*ELEMENT, type=T3D2, ELSET=Line11\n')
-    found6 = list_file.index('*ELEMENT, type=T3D2, ELSET=Line12\n')
+    found1 = list_file.index('*ELEMENT, type=CPS6, ELSET=Surface5\n')
+    found2 = list_file.index('*ELEMENT, type=CPS6, ELSET=Surface6\n')
+    found3 = list_file.index('*ELEMENT, type=T3D3, ELSET=Line1\n') ### ELEMENT 시작줄
+    found4 = list_file.index('*ELEMENT, type=C3D10, ELSET=Volume1\n') ### Volume Element 시작줄
+    found5 = list_file.index('*ELEMENT, type=T3D3, ELSET=Line11\n')
+    found6 = list_file.index('*ELEMENT, type=T3D3, ELSET=Line12\n')
 
     comp1=list_file[found1+1:found2-1] ### -> Surface5에 대한 element 들
     comp2=list_file[found2+1:found4-1] ### -> Surface6에 대한 element 들
@@ -175,7 +175,7 @@ def inpManipulation():
 
 
 if __name__ == "__main__":
-    os.system("powershell.exe "+os.getcwd()+u"\\script\\clean.ps1")
+    os.system("powershell.exe "+os.getcwd()+"\\scripts\\clean.ps1 12")
     runGmsh()
     inpManipulation()
 

@@ -3,13 +3,14 @@ param([String]$CaseName)
 if(-Not (Test-Path ".\cases")){ (mkdir .\cases) | Out-Null }
 if(-Not (Test-Path ".\cases\$CaseName")){ (mkdir .\cases\$CaseName) | Out-Null } 
 if(-Not ($(ls .\cases\$CaseName) -eq $null)){
-	$DirList = $(ls .\cases\$CaseName) | ForEach-Object { if($_.Mode -match "d"){ $_ } }
+	$DirList = $(ls .\cases\$CaseName) | ForEach-Object { if($_.Mode -match "d"){ $_.Name } }
 	if($DirList -eq $null){ 
 		$MvDir = ".\cases\$CaseName\1" 
 		(mkdir $MvDir) | Out-Null
 	}
 	else{
-		$MaxNum = [System.Int32]($DirList | Measure-Object -Maximum).Maximum + [System.Int32]1
+		$MaxNum = ($DirList | Measure-Object -Maximum).Maximum
+		$MaxNum = [System.Int32]$MaxNum + [System.Int32]1
 		$MvDir = ".\cases\$CaseName\$MaxNum"
 		(mkdir $MvDir) | Out-Null
 	}
