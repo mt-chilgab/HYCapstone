@@ -447,7 +447,7 @@ if __name__ == "__main__":
             augX = np.append(X, np.reshape(yObserved, (yObserved.shape[0],1)), axis=1)
             print("augX: ", augX)
 
-            outlierDetection = EllipticEnvelope(contamination=0.1)
+            outlierDetection = EllipticEnvelope(contamination=0.12)
             print("\nDetecting Outliers with Minimum Covariance Determinant (MCD): ")
             yHat = outlierDetection.fit_predict(augX)
             print("Outliers(-1): ", yHat)
@@ -502,7 +502,7 @@ if __name__ == "__main__":
 
                 # MAD is zero
                 if len(checkupMask.shape) == 0:
-                    if np.abs(1-checkupMask/constraintFuncValue[i]) < 0.05:
+                    if np.abs(1-checkupMask/constraintFuncValue[i]) < 0.01:
                         outlierMask[i] = True
                 
                 # MAD is nonzero
@@ -527,23 +527,24 @@ if __name__ == "__main__":
 
 
         # Infill points for Kriging + outlier detection with MCD
-        infillNum = 7
+        infillRep = 10
+        infillNum = 1
         outilerMask = []
         print("\nExperiments for Infill Points: ")
-        for i in range(infillNum):
+        for i in range(infillRep):
             # infill criteria are either 'ei' (expected improvement) or 'error' (point of biggest MSE)
             # and also, remember to set addPoint=False so we can decide whether a infill point and its observation is outlier.
-            newPts = krig.infill(1, method='ei', addPoint=False).tolist()
+            newPts = krig.infill(infillNum, method='ei', addPoint=False).tolist()
 
             sampleNumBeforehand = len(sampleList)
             sampleList += newPts
             for j in range(len(newPts)):
-                constraintFuncValue.append(*experiment(DVGroupList, [newPts[j]], 3*i+j+1)[1])
+                constraintFuncValue.append(*experiment(DVGroupList, [newPts[j]], infillNum*i+j+1)[1])
 
             sampleList, constraintFuncValue, outlierMask = detectOutliersMCD(sampleList, constraintFuncValue, deleteOutlierPts=True, infill=True, samplePtsBeforeInfill=sampleNumBeforehand) 
-            print("outlier removed: ", constraintFuncValue) 
+            print("outlier removed: ", sampleList, constraintFuncValue) 
             for j in range(sampleNumBeforehand, len(sampleList), 1):
-                krig.addPoint(np.array(sampleList[j]), constraintFuncValue[j])
+                krig.addPoint(np.array(sampleList[j]), np.array(constraintFuncValue[j]))
                 krig.train()
                         
             print("sampleList: ", sampleList, "\n")
