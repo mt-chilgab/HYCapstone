@@ -355,7 +355,7 @@ if __name__ == "__main__":
 
 
         # Design Variable Grouping
-        m = 10
+        m = 20
         ndv = 2
         includeEdge = 0
         WGroup = DVGroup(["W"], 100, 1000, m, includeEdge)
@@ -471,40 +471,54 @@ if __name__ == "__main__":
 
 
         # Simple median-absoulte-deviation(MAD) based 1D outlier detection for checkup
+        # Returns whether an observation is an outlier or not: True if outlier
         def detectOutliersMAD(constraintFuncValue, threshold=3.5):
             median = np.median(constraintFuncValue, axis=0)
             diff = np.abs(constraintFuncValue - median*np.ones(constraintFuncValue.shape[0]))
-            mad = np.median(diff)
-            modifiedZScore = 0.6745*diff/mad
+            mad = np.median(diff, axis=0)
 
-            return modifiedZScore > threshold
-
+            print("mad: ", mad)
+            if mad == 0:
+                return median
+            else:
+                modifiedZScore = 0.6745*diff/mad
+                return np.array(list(map(lambda Z: Z < threshold, modifiedZScore)))
+            
 
         # Redo experiments 5 times on outlier points
         outlierMask = detectOutliersMCD(sampleList, constraintFuncValue, deleteOutlierPts=False)
         for i in range(len(outlierMask)):
+            expRep = 7
             testObservations = []
             if not outlierMask[i]:
                 print("Re-doing experiment for detected outlier point: ", sampleList[i])
-                expRep = 7
 
                 for j in range(expRep):
                     testObservations.append(*experiment(DVGroupList, [sampleList[i]], j+1)[1])
                 testObservations = np.array(testObservations)
+                print("Initial checkup observations: ", testObservations)
+                
+                checkupMask = detectOutliersMAD(testObservations)
 
-                checkupMask = testObservations[detectOutliersMAD(testObservations).tolist()]
-                testObservations = testObservations[checkupMask]
+                # MAD is zero
+                if len(checkupMask.shape) == 0:
+                    if np.abs(1-checkupMask/constraintFuncValue[i]) < 0.05:
+                        outlierMask[i] = True
+                
+                # MAD is nonzero
+                else: 
+                    testObservations = testObservations[checkupMask]
 
-                print("Outlier removed checkup observations: ", testObservations)
+                    print("Outlier removed checkup observations: ", testObservations)
+                    testObservations = np.append(testObservations, [constraintFuncValue[i]], axis=0)
+                    checkupMask = detectOutliersMAD(testObservations)
 
-                testObservations.append(constraintFuncValue[i])
-                checkupMask = testObservations[detectOutliersMAD(testObservations).tolist()]
-
-                if checkupMask[-1]:
-                    outlierMask[i] = True
+                    if checkupMask[-1]:
+                        print("Prior experiment result seems ok\n")
+                        outlierMask[i] = True
 
         print("rearranged outlier mask: ", outlierMask)
-        sampleList, constraintFuncValue = sampleList[outlierMask], constraintFuncValue[outlierMask]
+        sampleList, constraintFuncValue = np.array(sampleList)[np.array(outlierMask)].tolist(), np.array(constraintFuncValue)[np.array(outlierMask)].tolist()
                 
                     
         # Kriging the result
@@ -513,7 +527,7 @@ if __name__ == "__main__":
 
 
         # Infill points for Kriging + outlier detection with MCD
-        infillNum = 2
+        infillNum = 7
         outilerMask = []
         print("\nExperiments for Infill Points: ")
         for i in range(infillNum):
@@ -538,7 +552,9 @@ if __name__ == "__main__":
             print("k.X length: ", krig.X.shape[0], "\n")
             print("k.y length: ", krig.y.shape[0], "\n")
 
+
         # Cross Validation of the model
+
 
 
         # Print the result and result assessment
