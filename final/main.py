@@ -1096,7 +1096,7 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
 
 
 if __name__ == "__main__":
-    FCPath = u'C:\\Users\\Grant\\AppData\\Local\\Programs\\FreeCAD 0.19'
+    FCPath = #@FCPath Placeholder
 
     try:
         FreeCADGui.showMainWindow()
@@ -1107,11 +1107,25 @@ if __name__ == "__main__":
 
         initialNameValueList = readNameValue()
 
-        myObj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "box") 
-        box(myObj)
+        myObj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Meridional") 
+        Meridional(myObj)
         if(bindProperties(myObj, initialNameValueList[0], initialNameValueList)):
             myObj.ViewObject.Proxy = 0 # this is mandatory unless we code the ViewProvider too
-            FreeCAD.ActiveDocument.recompute()
+        Mer = FreeCAD.ActiveDocument.getObject("Meridional")
+
+        myObj2 = FreeCAD.ActiveDocument.addObject('Part::FeaturePython', 'ModelOfBlade3D')
+        ModelOfBlade3D(myObj2)
+        if(bindProperties(myObj2, initialNameValueList[0], initialNameValueList)):
+            myObj2.ViewObject.Proxy = 0 # this is mandatory unless we code the ViewProvider too
+        Blade = FreeCAD.ActiveDocument.getObject("ModelOfBlade3D")
+
+
+        myObj3 = FreeCAD.ActiveDocument.addObject('Part::FeaturePython', 'Blades')
+        Blades(myObj3)
+        if(bindProperties(myObj3, initialNameValueList[0], initialNameValueList)):
+            myObj3.ViewObject.Proxy = 0 # this is mand atory unless we code the ViewProvider too
+        Bla = FreeCAD.ActiveDocument.getObject("Blades")
+        FreeCAD.ActiveDocument.recompute()
 
         path_os = os.getcwd()
         path_gui = re.sub(r'\\', '/',path_os)

@@ -77,8 +77,8 @@ if($PyCheck){
 	ls $FreeCadSPPath | ForEach-Object { Copy-Item -Recurse "$FreeCadSPPath\$($_.Name)" ".\$($_.Name)" }
 	ls $FreeCadModPath | ForEach-Object { Copy-Item -Recurse "$FreeCadModPath\$($_.Name)" ".\$($_.Name)" }
 		
-	echo "`nDownloading dependency... (pyKriging, gmsh, sty)"
-	pip install pyKriging gmsh sty
+	echo "`nDownloading dependency... (pyKriging, gmsh, sty, sklearn)"
+	pip install pyKriging gmsh sty sklearn
 
 	cd $pwd_
 }
