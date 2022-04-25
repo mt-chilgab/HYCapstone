@@ -1256,5 +1256,5 @@ if((Blades.FullDomainCFD == False) & (Blades.PeriodicDomainCFD == False)):
 
 
 # Export step and save FCStd file.
-Part.export(__objs__, savePath+"\\impeller3D.step")
+Part.export(__objs__, savePath+"\\impeller3D.stl")
 FreeCAD.ActiveDocument.saveAs(savePath+"\\impeller3D.FCStd")

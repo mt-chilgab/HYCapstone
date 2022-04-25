@@ -18,9 +18,8 @@ def silenceStdout(newStream=None):
         sys.stdout = oldStream
         newStream.seek(0)
 
-
 def frdManipulation():
-    with open('ex1static1.frd', 'r') as f:
+    with open('Static_analysis.frd', 'r',encoding = 'UTF-8') as f:
         list_file = []
         for line in f:
             list_file.append(line)
@@ -57,8 +56,6 @@ def frdManipulation():
         for sline in stress:
             f.write(sline)
         f.close()
-
-
 
 
 # Approximate Maximum von Mises Stress with p-Norm: Considering Computational Instability
@@ -107,8 +104,7 @@ def maxVonMises(p):
 
 
 
-if __name__ == "__main__":
-    
+if __name__ == "__main__": 
     with silenceStdout():
         frdManipulation()
 
