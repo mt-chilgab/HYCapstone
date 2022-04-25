@@ -22,5 +22,4 @@ General.VisibilityPositionX = 277;
 General.VisibilityPositionY = 118;
 Geometry.OCCMakeSolids = 1;
 Geometry.OCCSewFaces = 1;
-Mesh.Smoothing = 0;
-Mesh.MeshSizeFactor = 0.05;
+Mesh.MeshSizeFactor = 0.1;

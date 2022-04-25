@@ -102,10 +102,6 @@ def maxVonMises():
     #     f.writelines("hj, jh: "+str(hjMaxVM*math.pow(sum(hjVonMisesList), 1/p))+"   "+str(jhMaxVM*math.pow(sum(jhVonMisesList), 1/p))+"\n")
     #     f.close
 
-    with open(os.getcwd()+u"\\maxVonmises.txt", "a",encoding = 'UTF-8') as f:
-        f.writelines(format(hjMaxVM,'>15,.6E')+"\n")
-        f.close
-
     return float(hjMaxVM)
 
 
@@ -115,4 +111,4 @@ if __name__ == "__main__":
     with silenceStdout():
         frdManipulation()
 
-    print(float(maxVonMises(30)))
+    print(float(maxVonMises()))

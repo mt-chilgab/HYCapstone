@@ -38,7 +38,7 @@ def inpManipulation():
             list_file.append(line)
             if re.search('Surface',line):
                 NumberSurface += 1
-    f.close()
+        f.close()
 
     found1 = list_file.index('*ELEMENT, type=CPS6, ELSET=Surface'+str(NumberSurface)+'\n')
     # found2 = list_file.index('*ELEMENT, type=CPS6, ELSET=Surface6\n')
@@ -143,6 +143,7 @@ def inpManipulation():
     with open('Static_analysis.inp','w',encoding='UTF-8') as f:
         for name in string:
             f.write(name)
+        f.close()
 
 
 if __name__ == "__main__":

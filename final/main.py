@@ -1096,7 +1096,7 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
 
 
 if __name__ == "__main__":
-    FCPath = #@FCPath Placeholder
+    FCPath = "C:\\Program Files\\FreeCAD 0.19"
 
     try:
         FreeCADGui.showMainWindow()
@@ -1210,7 +1210,7 @@ if __name__ == "__main__":
                 #print("!"+preprocSTDOUT.decode('UTF-8')+"\n!!"+preprocSTDERR.decode('UTF-8'))
 
                 ccxDir = os.getcwd()+u"\\ccx\\etc"
-                femExec = subprocess.Popen([ccxDir+u"\\runCCXnoCLS.bat", os.getcwd()+u"\\ex1static1.inp"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                femExec = subprocess.Popen([ccxDir+u"\\runCCXnoCLS.bat", os.getcwd()+u"\\Static_analysis.inp"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 femSTDOUT, femSTDERR = femExec.communicate()
                 #print("!"+femSTDOUT.decode('UTF-8')+"\n!!"+femSTDERR.decode('UTF-8'))
 
