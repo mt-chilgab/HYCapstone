@@ -1185,10 +1185,24 @@ if __name__ == "__main__":
                 FreeCAD.ActiveDocument.recompute()
                 print("Recompute ok")
 
-                __objs__ = []
-                __objs__.append(FreeCAD.getDocument("Unnamed").getObject("box"))
-                Part.export(__objs__,path_gui+u"/box.step")
-                del __objs__
+                if Bla.FullDomainCFD == False and Bla.PeriodicDomainCFD == False:
+                    myObj4 = FreeCAD.ActiveDocument.addObject('Part::FeaturePython', 'Hub')
+                    Hub(myObj4)
+                    myObj4.ViewObject.Proxy = 0 # this is mandatory unless we code the ViewProvider too
+
+                    Fusion = FreeCAD.ActiveDocument.addObject("Part::MultiFuse","Fusion")
+                    FreeCAD.ActiveDocument.Fusion.Shapes = [FreeCAD.ActiveDocument.Blades,FreeCAD.ActiveDocument.Hub]
+                    FreeCAD.ActiveDocument.recompute()
+                    
+                    __objs__=[]
+                    __objs__.append(FreeCAD.getDocument("Unnamed").getObject("Fusion"))
+                    Part.export(__objs__,path_gui+u"/impeller.step")
+                    del __objs__
+                else:
+                    __objs__=[]
+                    __objs__.append(FreeCAD.getDocument("Unnamed").getObject("Blades"))
+                    Part.export(__objs__,path_gui+u"/impeller.step")
+                    del __objs__ 
                 print("Step export ok")
 
                 preprocExec = subprocess.Popen([sys.executable, os.getcwd()+u"\\preprocess.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)         
