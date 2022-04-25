@@ -5,7 +5,6 @@ import os, sys
 import numpy as np
 
 
-
 def runGmsh():
     gmsh.initialize()
 
@@ -146,10 +145,8 @@ def inpManipulation():
             f.write(name)
 
 
-
-
 if __name__ == "__main__":
-    os.system("powershell.exe "+os.getcwd()+"\\scripts\\clean.ps1 12")
+    os.system("powershell.exe "+os.getcwd()+u"\\script\\clean.ps1")
     runGmsh()
     inpManipulation()
 

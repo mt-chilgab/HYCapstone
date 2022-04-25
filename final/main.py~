@@ -1096,7 +1096,7 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
 
 
 if __name__ == "__main__":
-    FCPath = #@FCPath Placeholder
+    FCPath = "C:\\Users\\Grant\\AppData\\Local\\Programs\\FreeCAD 0.19"
 
     try:
         FreeCADGui.showMainWindow()

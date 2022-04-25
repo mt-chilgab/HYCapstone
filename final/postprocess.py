@@ -18,6 +18,7 @@ def silenceStdout(newStream=None):
         sys.stdout = oldStream
         newStream.seek(0)
 
+
 def frdManipulation():
     with open('Static_analysis.frd', 'r',encoding = 'UTF-8') as f:
         list_file = []
@@ -58,9 +59,11 @@ def frdManipulation():
         f.close()
 
 
+
+
 # Approximate Maximum von Mises Stress with p-Norm: Considering Computational Instability
 # p = 10
-def maxVonMises(p):
+def maxVonMises():
     stress_list = []
     with open(os.getcwd()+u"\\stress.frd", mode='r', encoding='UTF-8') as f:
         lines = f.readlines()
@@ -92,19 +95,23 @@ def maxVonMises(p):
     hjMaxVM = max(hjVonMisesList)
     jhMaxVM = max(jhVonMisesList)
     
-    #hjVonMisesList = [ math.pow(stress/hjMaxVM, p) for stress in hjVonMisesList ]
-    #jhVonMisesList = [ math.pow(stress/jhMaxVM, p) for stress in jhVonMisesList ]
+    # hjVonMisesList = [ math.pow(stress/hjMaxVM, p) for stress in hjVonMisesList ]
+    # jhVonMisesList = [ math.pow(stress/jhMaxVM, p) for stress in jhVonMisesList ]
     
-    #with open(os.getcwd()+u"\\comparison.txt", "a") as f:
-    #    f.writelines("hj, jh: "+str(hjMaxVM*math.pow(sum(hjVonMisesList), 1/p))+"   "+str(jhMaxVM*math.pow(sum(jhVonMisesList), 1/p))+"\n")
-    #    f.close
+    # with open(os.getcwd()+u"\\comparison.txt", "a",encoding = 'UTF-8') as f:
+    #     f.writelines("hj, jh: "+str(hjMaxVM*math.pow(sum(hjVonMisesList), 1/p))+"   "+str(jhMaxVM*math.pow(sum(jhVonMisesList), 1/p))+"\n")
+    #     f.close
 
-    #return jhMaxVM*math.pow(sum(jhVonMisesList), 1/p)
-    return jhMaxVM
+    with open(os.getcwd()+u"\\maxVonmises.txt", "a",encoding = 'UTF-8') as f:
+        f.writelines(format(hjMaxVM,'>15,.6E')+"\n")
+        f.close
+
+    return float(hjMaxVM)
 
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
+    
     with silenceStdout():
         frdManipulation()
 
