@@ -313,7 +313,6 @@ class Blades:
         aveCurve = aveCurveIntersect[0]
 
         AveProfile = thicknessProfile(obj.ThicknessLEAve, obj.ThicknessPoint1Ave, obj.ThicknessPoint2Ave, obj.ThicknessTEAve, aveCurve, BladeFace, BladeSurface, "Average", BladeEdgeTe, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 0.5, 1.05)
-        Part.show(AveProfile)
 
         #BladeSurfaceModel = Part.makeLoft([ShroudProfile2, ShroudProfile, AveProfile, HubProfile, HubProfile2])
         BladeSurfaceModel = Part.makeLoft([ShroudProfile2, AveProfile, HubProfile2])

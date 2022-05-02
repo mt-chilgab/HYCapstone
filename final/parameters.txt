@@ -13,96 +13,80 @@
 
 
 ### Variables from Script #1
-# Diameter of an impeller [mm]
-float D2 = 1100
+# Radius of Hub Circle [mm]
+float R = 187.17
+# Point of a Hub Circle Center [( mm , mm , mm )]
+fvec HubCenter = (-45.6,219.4,0)
+# Major Radius of Shroud Ellipse [mm]
+float a = 105
+# Minor Radius of Shroud Ellipse [mm]
+float b = 95.25
+# Point of a Shroud Ellipse Center [mm]
+fvec EllipseCenter = (21.3,208,0)
 # Diameter of a hub [mm]
-float d0 = 100
+float D2 = 400
 # Diameter of a shaft [mm]
-float ds = 90
-# Suction diameter [mm]
-float D0 = 850
-# Width of a outlet [mm]
-float b2 = 250
-# Length [mm]
-float L = 300
-# Thickness of Shroud [mm] (Not available)
-float ThicknessShroud = 21.4
+float ds = 36
 # Thickness of Hub [mm]
-float ThicknessHub = 21.4
-
-# Type of blades
-bool CylindricalBlades = False
-# Place of a leading edge, % (shroud)
-int LePositionShroud = 15
-# Place of a leading edge, % (hub)
-int LePositionHub = 55
-# Place of a leading edge, % (average)
-int LePositionAverage = 40
-
+float ThicknessHub=8
 
 
 ### Variables from Script #2
 # Beta Angles of a shroud streamline [deg]
-float AngleBeta1Shroud = 15
-float AngleBeta2Shroud = 25
+float AngleBeta1Shroud = 20
+float AngleBeta2Shroud = 85
 # Beta Angles of a shroud streamline [(%, deg, 0)]
-fvec AngleBetaPoint1Shroud = (40,18,0)
-fvec AngleBetaPoint2Shroud = (75,22.5,0)
+fvec AngleBetaPoint1Shroud = (25,24.5,0)
+fvec AngleBetaPoint2Shroud = (50,29,0)
+fvec AngleBetaPoint3Shroud = (75,34,0)
 bool AnglesChartShroud = False
 
 # Beta Angles of a hub streamline [deg]
-float AngleBeta1Hub = 32
-float AngleBeta2Hub = 25
+float AngleBeta1Hub = 40
+float AngleBeta2Hub = 85
 # Beta Angles of a hub streamline [(%, deg, 0)]
-fvec AngleBetaPoint1Hub = (40,29,0)
-fvec AngleBetaPoint2Hub = (75.0, 27, 0.0)
+fvec AngleBetaPoint1Hub = (25,45,0)
+fvec AngleBetaPoint2Hub = (50,50, 0.0)
+fvec AngleBetaPoint3Hub = (75,55, 0.0)
 bool AnglesChartHub = False
 
 # Beta Angles of a average streamline [deg]
-float AngleBeta1Ave = 26
-float AngleBeta2Ave = 25
+#float AngleBeta1Ave = 26
+#float AngleBeta2Ave = 25
 # Beta Angles of a average streamline [(%, deg, 0)]
-fvec AngleBetaPoint1Ave = (40,25.5,0)
-fvec AngleBetaPoint2Ave = (75,25,0)
-bool AnglesChartAverage = False
+#fvec AngleBetaPoint1Ave = (40,25.5,0)
+#fvec AngleBetaPoint2Ave = (75,25,0)
+#bool AnglesChartAverage = False
+
+float AngleAlpha1 = 0
+float AngleAlpha2 = 10
+fvec AngleAlphaPoint1 = (25, 3, 0)
+fvec AngleAlphaPoint2 = (50, 5, 0)
+fvec AngleAlphaPoint3 = (75, 7, 0)
+
 
 # Number of Calculation Points of Beta Angle
 int N = 1000
 
 ### Variables from Script #3
 # Blade Thickness for Shroud [mm]
-float ThicknessLEShroud = 21.4
-float ThicknessTEShroud = 21.4
-# Blade Thickness for Shroud [(%, mm, 0)]-> float 형태로 바꾸기
-# fvec ThicknessPoint1Shroud = (40, 21.4, 0)
-# fvec ThicknessPoint2Shroud = (75, 21.4, 0)
-float ThicknessPoint1Shroud = 21.4
-float ThicknessPoint2Shroud = 21.4
+float ThicknessLEShroud = 1.3
+float ThicknessTEShroud = 1.3
+float ThicknessPoint1Shroud = 1.3
+float ThicknessPoint2Shroud = 1.3
 
 # Blade Thickness for Hub [mm]
-float ThicknessLEHub = 21.4
-float ThicknessTEHub = 21.4
-# Blade Thickness for Hub [(%, mm, 0)]
-# fvec ThicknessPoint1Hub = (40, 21.4, 0)
-# fvec ThicknessPoint2Hub = (75, 21.4, 0)
-float ThicknessPoint1Hub = 21.4
-float ThicknessPoint2Hub = 21.4
-
-# Blade Thickness for Average [mm]
-float ThicknessLEAve = 21.4
-float ThicknessTEAve = 21.4
-# Blade Thickness for Average [(%, mm, 0)]
-# fvec ThicknessPoint1Ave = (40.0, 21.4, 0.0)
-# fvec ThicknessPoint2Ave = (75, 21.4, 0)
-float ThicknessPoint1Ave = 21.4
-float ThicknessPoint2Ave = 21.4
+float ThicknessLEHub = 2.0
+float ThicknessTEHub = 2.0
+float ThicknessPoint1Hub = 2.0
+float ThicknessPoint2Hub = 2.0
 
 ### Variables for Shape of Edges
 bool TraillingEdgeEllipse = False
 int LeadingEdgeType = 1
 int TraillingEdgeType = 1
 
-int NumberOfBlades = 7
+int NumberOfBlades = 24
 
 ### Variables for CFD Model
 bool FullDomainCFD = False
@@ -110,7 +94,11 @@ bool PeriodicDomainCFD = False
 float HalfD3toD2 = 1.2
 
 
+### Variables from Script #4
+float HubDiameter2 = 100
+float HubLength = 20.66
 
-### Material Properties
-matprop float E = 210e3,.3
-matprop float rho = 7.8e-9
+# Material Properties for FEA (Aluminium)
+matprop float E = 71.7e3,.33
+matprop float rho = 2.83e-9
+

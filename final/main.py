@@ -7,7 +7,8 @@ import logging
 logging.basicConfig(filename=os.getcwd()+u"\\log", level=logging.DEBUG)
 
 # Import FreeCAD related modules
-import FreeCAD, FreeCADGui, Part
+import FreeCAD, FreeCADGui
+import Part, BOPTools.SplitAPI
 
 # DoE(OLHS) and Metamodeling(Kriging)
 import math
@@ -24,780 +25,639 @@ import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 
 
+
 class Meridional:
-	def __init__(self, obj):
-		obj.Proxy = self
-		obj.addProperty("App::PropertyFloat", "D2", "Dimensions", "Diameter of an impeller")
-		obj.addProperty("App::PropertyFloat", "d0", "Dimensions", "Diameter of a hub")
-		obj.addProperty("App::PropertyFloat", "ds", "Dimensions", "Diameter of a Shaft")
-		obj.addProperty("App::PropertyFloat", "D0", "Dimensions", "Suction diameter")
-		obj.addProperty("App::PropertyFloat", "b2", "Dimensions", "Width of a outlet")
-		obj.addProperty("App::PropertyFloat", "L", "Dimensions", "Length")
-		obj.addProperty("App::PropertyFloat", "ThicknessShroud", "Dimensions", "Value of the Thickness Shroud")
-		obj.addProperty("App::PropertyFloat", "ThicknessHub", "Dimensions", "Value of the Thickness Hub")
-		obj.addProperty("App::PropertyBool", "CylindricalBlades", "Type of blades", "Number of streamlines")
-		obj.addProperty("App::PropertyPercent", "LePositionShroud", "Place of a Leading edge, %")
-		obj.addProperty("App::PropertyPercent", "LePositionHub", "Place of a Leading edge, %")
-		obj.addProperty("App::PropertyPercent", "LePositionAverage", "Place of a Leading edge, %")
-		
+    def __init__(self,obj):
+        obj.Proxy = self  
+        obj.addProperty("App::PropertyFloat", "R", "Dimensions", "Radius of Hub Circle").R=187.17
+        obj.addProperty("App::PropertyVector", "HubCenter", "Center of Geometry", "Point of a Hub Circle Center").HubCenter = (-45.6,219.4,0)
+        obj.addProperty("App::PropertyFloat", "a", "Dimensions", "Major Radius of Shroud Ellipse").a = 105
+        obj.addProperty("App::PropertyFloat", "b", "Dimensions", "Minor Radius of Shroud Ellipse").b = 95.25
+        obj.addProperty("App::PropertyVector", "EllipseCenter", "Center of Geometry", "Point of a Shroud Ellipse Center").EllipseCenter = (21.3,208,0)
+        obj.addProperty("App::PropertyFloat", "D2", "Dimensions", "Diameter of the impeller").D2 = 400
+        obj.addProperty("App::PropertyFloat", "ds", "Dimensions", "Diameter of the shaft").ds = 70
+        obj.addProperty("App::PropertyFloat", "ThicknessHub", "Dimensions", "Thickness of hub").ThicknessHub = 10
 
+    def execute (self, obj):
+        draftAxis = FreeCAD.Vector(0,0,1)
+        HubCircle = Part.Circle(obj.HubCenter , draftAxis, obj.R)        
+        ShroudEllipse = Part.Ellipse(obj.EllipseCenter, obj.a, obj.b)
+        AveCurve = Part.Ellipse((obj.HubCenter+obj.EllipseCenter)/2, (obj.R+obj.a)/2, (obj.R+obj.b)/2)
 
-	def execute (self, obj):
-		R2 = obj.D2/2.
-		r0 = obj.d0/2.
-		R0 = obj.D0/2.
+        HCS = HubCircle.toShape()
+        SES = ShroudEllipse.toShape()
+        AES = AveCurve.toShape()
 
-		# Create points:
-		shroudP1 = FreeCAD.Vector(0, R0,0)
-		shroudP2 = FreeCAD.Vector(obj.L,R0,0)
-		shroudP3 = FreeCAD.Vector(obj.L,(R2+R0)/2.,0)
-		shroudP4 = FreeCAD.Vector(obj.L,R2,0)
-		
-		hubP1 = FreeCAD.Vector(0,r0,0)
-		hubP2 = FreeCAD.Vector(obj.L+obj.b2,r0,0)
-		hubP3 = FreeCAD.Vector(obj.L+obj.b2,(R2+R0)/2,0)
-		hubP4 = FreeCAD.Vector(obj.L+obj.b2, R2,0)
+        SP1 = FreeCAD.Vector(0,0,0)
+        SP2 = FreeCAD.Vector(0,obj.D2/2,0)
+        SP3 = FreeCAD.Vector(obj.D2/2,obj.D2/2,0)
+        SP4 = FreeCAD.Vector(obj.EllipseCenter.x,0,0)
+        SP5 = FreeCAD.Vector(obj.EllipseCenter.x,obj.D2/2,0)
 
-		aveCurveP1 = FreeCAD.Vector(0, (R0+r0)/2., 0)
-		aveCurveP2 = FreeCAD.Vector((obj.L+obj.b2+obj.L)/2.,(R0+r0)/2., 0)
-		aveCurveP3 = FreeCAD.Vector((obj.L+obj.b2+obj.L)/2., (R2+R0)/2., 0)
-		aveCurveP4 = FreeCAD.Vector((obj.L+obj.b2+obj.L)/2., R2, 0)
+        splitLine1 = Part.LineSegment(SP1,SP2).toShape()
+        splitLine2 = Part.LineSegment(SP2,SP3).toShape()
+        splitLine3 = Part.LineSegment(SP4,SP5).toShape()
 
+        Bases = Part.Compound([HCS,SES, AES])
 
-		shroudP = [shroudP1, shroudP2, shroudP3, shroudP4]
-		hubP = [hubP1, hubP2, hubP3, hubP4]
-		aveCurveP = [aveCurveP1, aveCurveP2, aveCurveP3, aveCurveP4]
-		
-		shroud = Part.BezierCurve()
-		shroud.setPoles(shroudP)
-		shroud.toShape()
-		shroudDiscret = shroud.discretize(Number = 100)
+        cutted1 = BOPTools.SplitAPI.booleanFragments([Bases,splitLine1,splitLine2],"Split",0.0)
+        
+        HubEdge = Part.Compound([cutted1.Edges[9]])
+        ShroudEdge = Part.Compound([cutted1.Edges[12]])
+        AveEdge = Part.Compound([cutted1.Edges[15]])
+        Edges = Part.Compound([HubEdge,ShroudEdge, AveEdge])
 
-		hub = Part.BezierCurve()
-		hub.setPoles(hubP)
-		hub.toShape()
-		hubDiscret = hub.discretize(Number = 100)			
+        cutted2 = BOPTools.SplitAPI.booleanFragments([Edges,splitLine3],"Split",0.0) 
 
-		aveCurve = Part.BezierCurve()
-		aveCurve.setPoles(aveCurveP)
-		aveCurve.toShape()
-		aveCurveDiscret = aveCurve.discretize(Number = 100)
+        HubEdge1 = Part.Compound([cutted2.Edges[4]])
+        HubEdge2 = Part.Compound([cutted2.Edges[5]])
+        ShroudEdge1 = Part.Compound([cutted2.Edges[6]])
+        ShroudEdge2 = Part.Compound([cutted2.Edges[7]])
+        AveEdge = Part.Compound([cutted2.Edges[9]])
 
-		inlet1 = Part.LineSegment(shroudP1,FreeCAD.Vector(0, (R0+r0)/2., 0)).toShape()
-		inlet2 = Part.LineSegment(FreeCAD.Vector(0, (R0+r0)/2., 0),hubP1).toShape()
-		outlet1 = Part.LineSegment(shroudP4,FreeCAD.Vector((obj.L+obj.b2+obj.L)/2., R2, 0)).toShape()
-		outlet2 = Part.LineSegment(FreeCAD.Vector((obj.L+obj.b2+obj.L)/2., R2, 0), hubP4).toShape()
+        inletEdge = Part.Compound([cutted1.Edges[1], cutted1.Edges[2]])
+        bladeEdge = Part.Compound([cutted2.Edges[1], cutted2.Edges[2]])
+        outletEdge = Part.Compound([cutted1.Edges[5], cutted1.Edges[6]])
 
-		# Creation of the separating meridional plane
-		shroud1Discret = shroudDiscret[0:(obj.LePositionShroud+1)]
-		shroud2Discret = shroudDiscret[obj.LePositionShroud:101]
+        w = Part.Compound([HubEdge1,HubEdge2,ShroudEdge1,ShroudEdge2,inletEdge,bladeEdge,outletEdge])
 
-		hub1Discret = hubDiscret[0:(obj.LePositionHub+1)]
-		hub2Discret = hubDiscret[obj.LePositionHub:101]
+        HubSurface = HubEdge.revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        ShroudSurface = ShroudEdge.revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
 
-		aveCurve1Discret = aveCurveDiscret[0:(obj.LePositionAverage+1)]
-		aveCurve2Discret = aveCurveDiscret[obj.LePositionAverage:101]
-
-		# Creation of the Le curve
-
-		LePoints = [shroud2Discret[0],aveCurve2Discret[0], hub2Discret[0]]
-		LeCurve = Part.BSplineCurve()
-		LeCurve.interpolate(LePoints)
-		
-		LeCurveDiscret = LeCurve.discretize(Number = 100)
-
-		Le1CurveDiscret = LeCurveDiscret[0:51]
-		Le2CurveDiscret = LeCurveDiscret[50:101]
-
-		# Creation a Wire of the Meridional plane of a blades
-		shroud1 = Part.BSplineCurve()
-		shroud1.interpolate(shroud1Discret)
-
-		shroud2 = Part.BSplineCurve()
-		shroud2.interpolate(shroud2Discret)
-
-		hub1 = Part.BSplineCurve()
-		hub1.interpolate(hub1Discret)
-
-		hub2 = Part.BSplineCurve()
-		hub2.interpolate(hub2Discret)
-
-		Le1Curve = Part.BSplineCurve()
-		Le1Curve.interpolate(Le1CurveDiscret)
-
-		Le2Curve = Part.BSplineCurve()
-		Le2Curve.interpolate(Le2CurveDiscret)
-
-		aveCurve1 = Part.BSplineCurve()
-		aveCurve1.interpolate(aveCurve1Discret)
-
-		aveCurve2 = Part.BSplineCurve()
-		aveCurve2.interpolate(aveCurve2Discret)
-
-		if obj.CylindricalBlades==False:
-			w = Part.Wire([inlet1,inlet2, shroud1.toShape(), shroud2.toShape(), outlet1, outlet2, hub1.toShape(), hub2.toShape(), Le1Curve.toShape(), Le2Curve.toShape(), aveCurve1.toShape(), aveCurve2.toShape()], closed = False)
-		else:
-			w = Part.Wire([inlet1,inlet2, shroud1.toShape(), shroud2.toShape(), outlet1, outlet2, hub1.toShape(), hub2.toShape(), Le1Curve.toShape(), Le2Curve.toShape()], closed = False)
-		
-		shroudSurface = shroud.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-		hubSurface = hub.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-
-
-		obj.Shape = Part.Compound([w, shroudSurface, hubSurface])
+        obj.Shape = Part.Compound([w, ShroudSurface, HubSurface])
 
 class ModelOfBlade3D:
-	def __init__(self, obj):
-		obj.Proxy = self
-		obj.addProperty("App::PropertyFloat", "AngleBeta1Shroud", "Angles of a Shroud streamline", "Inlet angle")
-		obj.addProperty("App::PropertyFloat", "AngleBeta2Shroud", "Angles of a Shroud streamline", "Outlet angle")
-		obj.addProperty("App::PropertyVector", "AngleBetaPoint1Shroud", "Angles of a Shroud streamline", "Point of a B-spline, z-coodrinate non active")
-		obj.addProperty("App::PropertyVector", "AngleBetaPoint2Shroud", "Angles of a Shroud streamline", "Point of a B-spline, z-coodrinate non active")
-		obj.addProperty("App::PropertyBool", "AnglesChartShroud", "Angles of a Shroud streamline", "It is shows chart angle Beta-Streamline")
+    def __init__(self, obj):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyFloat", "AngleBeta1Shroud", "Angles of a Shroud streamline", "Inlet angle").AngleBeta1Shroud=20
+        obj.addProperty("App::PropertyFloat", "AngleBeta2Shroud", "Angles of a Shroud streamline", "Outlet angle").AngleBeta2Shroud=85
+        obj.addProperty("App::PropertyVector", "AngleBetaPoint1Shroud", "Angles of a Shroud streamline", "Point of a B-spline, z-coodrinate non active").AngleBetaPoint1Shroud=(25,24.5,0)
+        obj.addProperty("App::PropertyVector", "AngleBetaPoint2Shroud", "Angles of a Shroud streamline", "Point of a B-spline, z-coodrinate non active").AngleBetaPoint2Shroud=(50,29,0)
+        obj.addProperty("App::PropertyVector", "AngleBetaPoint3Shroud", "Angles of a Shroud streamline", "Point of a B-spline, z-coodrinate non active").AngleBetaPoint3Shroud=(75,34,0)
+        obj.addProperty("App::PropertyBool", "AnglesChartShroud", "Angles of a Shroud streamline", "It is shows chart angle Beta-Streamline").AnglesChartShroud=False
 
-		obj.addProperty("App::PropertyFloat", "AngleBeta1Hub", "Angles of a Hub streamline", "Inlet angle")
-		obj.addProperty("App::PropertyFloat", "AngleBeta2Hub", "Angles of a Hub streamline", "Outlet angle")
-		obj.addProperty("App::PropertyVector", "AngleBetaPoint1Hub", "Angles of a Hub streamline", "Point of a B-spline, z-coodrinate non active")
-		obj.addProperty("App::PropertyVector", "AngleBetaPoint2Hub", "Angles of a Hub streamline", "Point of a B-spline, z-coodrinate non active")
-		obj.addProperty("App::PropertyBool", "AnglesChartHub", "Angles of a Hub streamline", "It is shows chart angle Beta-Streamline")
+         
+        obj.addProperty("App::PropertyFloat", "AngleBeta1Hub", "Angles of a Hub streamline", "Inlet angle").AngleBeta1Hub=40.05
+        obj.addProperty("App::PropertyFloat", "AngleBeta2Hub", "Angles of a Hub streamline", "Outlet angle").AngleBeta2Hub=83.15
+        obj.addProperty("App::PropertyVector", "AngleBetaPoint1Hub", "Angles of a Hub streamline", "Point of a B-spline, z-coodrinate non active").AngleBetaPoint1Hub=(25,45,0)
+        obj.addProperty("App::PropertyVector", "AngleBetaPoint2Hub", "Angles of a Hub streamline", "Point of a B-spline, z-coodrinate non active").AngleBetaPoint2Hub=(50,50,0)
+        obj.addProperty("App::PropertyVector", "AngleBetaPoint3Hub", "Angles of a Hub streamline", "Point of a B-spline, z-coodrinate non active").AngleBetaPoint3Hub=(75,55,0)
+        obj.addProperty("App::PropertyBool", "AnglesChartHub", "Angles of a Hub streamline", "It is shows chart angle Beta-Streamline").AnglesChartHub=False
 
-		obj.addProperty("App::PropertyFloat", "AngleBeta1Ave", "Angles of an Average streamline (when Cylindrical blade = False)")
-		obj.addProperty("App::PropertyFloat", "AngleBeta2Ave", "Angles of an Average streamline (when Cylindrical blade = False)")
-		obj.addProperty("App::PropertyVector", "AngleBetaPoint1Ave", "Angles of an Average streamline (when Cylindrical blade = False)")
-		obj.addProperty("App::PropertyVector", "AngleBetaPoint2Ave", "Angles of an Average streamline (when Cylindrical blade = False)")
-		obj.addProperty("App::PropertyBool", "AnglesChartAverage", "Angles of an Average streamline (when Cylindrical blade = False)")
-		obj.addProperty("App::PropertyInteger", "N", "Number of the calculation points")
-	
-	def execute (self,obj):
-		N=obj.N
-		Mer=FreeCAD.ActiveDocument.getObject("Meridional")
-		shroudEdge = Mer.Shape.Edges[3]
-		shroudEdgeDiscret = shroudEdge.discretize(Number = N)
-		shroudEdgeDiscret.append(shroudEdge.lastVertex().Point)
+        obj.addProperty("App::PropertyFloat", "AngleAlpha1", "Relative theta delay between hub and shroud streamline", "Inlet angle").AngleAlpha1=0
+        obj.addProperty("App::PropertyFloat", "AngleAlpha2", "Relative theta delay between hub and shroud streamline", "Outlet angle").AngleAlpha2=10
+        obj.addProperty("App::PropertyVector", "AngleAlphaPoint1", "Relative theta delay between hub and shroud streamline", "Point of a B-spline, z-coodrinate non active").AngleAlphaPoint1=(25,3,0)
+        obj.addProperty("App::PropertyVector", "AngleAlphaPoint2", "Relative theta delay between hub and shroud streamline", "Point of a B-spline, z-coodrinate non active").AngleAlphaPoint2=(50,5,0)
+        obj.addProperty("App::PropertyVector", "AngleAlphaPoint3", "Relative theta delay between hub and shroud streamline", "Point of a B-spline, z-coodrinate non active").AngleAlphaPoint3=(75,7,0)
+ 
+        obj.addProperty("App::PropertyInteger", "N", "Number of the calculation points").N=1000
+ 
+    def execute(self, obj):
+        Mer = FreeCAD.ActiveDocument.getObject("Meridional")
+        N = obj.N
 
-		hubEdge = Mer.Shape.Edges[7]
-		hubEdgeDiscret = hubEdge.discretize(Number = N)
-		hubEdgeDiscret.append(hubEdge.lastVertex().Point)
+        # Adds the last vertex because it uses forward finite differentials
+        hubEdge = Mer.Shape.Edges[1]
+        hubEdgeDiscret = hubEdge.discretize(Number = N)
+        shroudEdge = Mer.Shape.Edges[3]
+        shroudEdgeDiscret = shroudEdge.discretize(Number = N)
+        aveEdge = Mer.Shape.Edges[4]
+        aveEdgeDiscret = aveEdge.discretize(Number = N)
 
-		N = len(shroudEdgeDiscret)
+        def streamlineBladeByBeta(betaPointsList, AngleBetaInitial, AngleBetaFinal, DiscretEdgeList):
+            betaPoints  = [FreeCAD.Vector(0, AngleBetaInitial, 0)] + betaPointsList + [FreeCAD.Vector(100, AngleBetaFinal, 0)]
+            betaCurve = Part.BSplineCurve()
+            betaCurve.interpolate(betaPoints)
+            betaCurveDiscret = []
 
-##### THIS IS FUNCTION FOR CREATION OF A STREAMLINES FROM MERIDIONAL PLAN ###############################################
-		def streamlineBlade (AngleBeta1, AngleBetaPoint1, AngleBetaPoint2, AngleBeta2, DiscretEdgeOfMeridional):
-		
-			# Creation of a Beta angle curve
-			betaPoints = [FreeCAD.Vector(0, AngleBeta1, 0), AngleBetaPoint1, AngleBetaPoint2 ,FreeCAD.Vector(100, AngleBeta2, 0)]
-			betaCurve = Part.BSplineCurve()
-			betaCurve.interpolate(betaPoints)
-			betaCurveDiscret = []
-			for i in range (1, (N+1), 1):
-				vector_line1 = FreeCAD.Vector(float(i)/(float(N)/100.), -180, 0)
-				vector_line2 = FreeCAD.Vector(float(i)/(float(N)/100.), 180, 0)
-				line = Part.LineSegment(vector_line1, vector_line2)
-				betaIntersect = betaCurve.intersectCC(line)
-				betaCurveDiscret.append(betaIntersect)
+            for i in range(0, N, 1):
+                lowerBound = FreeCAD.Vector(100.*float(i)/float(N-1), -180, 0)
+                upperBound = FreeCAD.Vector(100.*float(i)/float(N-1), 180, 0)
 
-			# Calculation of the Theta angle streamline
-
-			ri = []
-			for i in range (0,N,1):
-				vector_i = DiscretEdgeOfMeridional[i]
-				ri.append(vector_i.y) 
-
-			betai = []
-			for i in range (0,N,1):
-				vector_betai = betaCurveDiscret[i][0]
-				betai.append(vector_betai.Y)
-
-			BfuncList = []
-			for i in range (0,N,1):
-				BfuncList.append(1./(ri[i]*np.tan(betai[i]*np.pi/180.)))
-
-			BfuncListSr = []
-			for i in range (0, (N-1), 1):
-				funcX = (BfuncList[i]+BfuncList[i+1])/2.
-				BfuncListSr.append(funcX)
+                constLine = Part.LineSegment(lowerBound, upperBound)
+                betaIntersect = betaCurve.intersectCC(constLine)
+                
+                betaCurveDiscret.append(betaIntersect)
 
 
-			ds_x = []
-			ds_y = []
-			for i in range (0, N, 1):
-				vector_Edge = DiscretEdgeOfMeridional[i]
-				ds_x.append(vector_Edge.x)
-				ds_y.append(vector_Edge.y)
+            # From ds / (r tan(beta)) = dTheta,
+            # As we have beta curve and can calculate ds and r, we can calculate theta value for each meridional discretized points
+            # -> would lead to physical postion on a streamline
+           
+            # Get the beta value(beta curve) of corresponding meridional discretized points
+            beta_i = list(map(lambda beta: beta[0].Y, betaCurveDiscret))
+            betaMid_i = [(beta_i[i+1]+beta_i[i])/2 for i in range(0, N-1, 1)]
+            
+            # Get the value of r's for each discretized points of hub/shroud edge
+            r_i = list(map(lambda merPosVec: merPosVec.y, DiscretEdgeList))
+            rMid_i = [(r_i[i+1]+r_i[i])/2 for i in range(0, N-1, 1)]
 
-			ds = []
-			for i in range (0, (N-1), 1):
-				ds.append(np.sqrt((ds_x[i+1]-ds_x[i])**2+(ds_y[i+1]-ds_y[i])**2))
+            # Get the length of meridional differential line segments(ds) corresponding to each meridional discretized points
+            ds_i = []
+            for i in range(0, N-1, 1):
+                xDirLength = DiscretEdgeList[i+1].x - DiscretEdgeList[i].x
+                yDirLength = DiscretEdgeList[i+1].y - DiscretEdgeList[i].y
+                ds_i.append(np.sqrt(np.power(xDirLength, 2)+np.power(yDirLength, 2)))
+            
+            # Now calculate corresponding theta of corresponding meridional discretized points
+            dTheta_i = [180.*ds_i[i]/(rMid_i[i]*np.pi*np.tan(np.pi*betaMid_i[i]/180.)) for i in range(0, N-1, 1)]
+            Theta_i = [0, ]
+            for i in range(0, N-1, 1):
+                Theta_i.append(Theta_i[i] + dTheta_i[i])
+            
+            # Finally, get the physical coordinate in Cartesian coordinate xyz
+            physCoordX_i = list(map(lambda merPosVec: merPosVec.x, DiscretEdgeList))
+            physCoordY_i = list(map(lambda merPosVec, theta: merPosVec.y*np.cos(np.pi*theta/180.), DiscretEdgeList, Theta_i))
+            physCoordZ_i = list(map(lambda merPosVec, theta: merPosVec.y*np.sin(np.pi*theta/180.), DiscretEdgeList, Theta_i))
 
-			dTheta = []
-			for i in range (0,(N-1),1):
-				dTheta.append(ds[i]*BfuncListSr[i]*180./np.pi)
+            # B-Spline of physCoords = desired streamline
+            coordList = list(map(lambda X, Y, Z: FreeCAD.Vector(X, Y, Z), physCoordX_i, physCoordY_i, physCoordZ_i))
+        
+            streamline = Part.BSplineCurve()
+            streamline.interpolate(coordList)
 
-			dThetaSum = [dTheta[0]]
-			for i in range (0,(N-2),1):
-				dThetaSum.append(dThetaSum[i]+dTheta[i+1])
+            return streamline.toShape(), beta_i, Theta_i
 
-			# Coordinates is XYZ of the streamline	
-			coord_x = ds_x
+        
+        def relativeStreamlineByAlpha(alphaPointsList, AngleAlphaInitial, AngleAlphaFinal, DiscretEdgeList, DiscretEdgeListRelative, thetaiRelative):
+            alphaPoints = [FreeCAD.Vector(0, AngleAlphaInitial, 0)] + alphaPointsList + [FreeCAD.Vector(100, AngleAlphaFinal, 0)]
+            alphaCurve = Part.BSplineCurve()
+            alphaCurve.interpolate(alphaPoints)
 
-			coord_y = [ds_y[0]]
-			for i in range(0, (N-1), 1):
-				coord_y.append(ds_y[i]*np.cos(np.pi*dThetaSum[i]/180))
+            alphaCurveDiscret = []
+            gammaDiscret = []
 
-			coord_z = [0.0]
-			for i in range(0, (N-1), 1):
-				coord_z.append(ds_y[i]*np.sin(np.pi*dThetaSum[i]/180))
+            for i in range(0, N, 1):
+                lowerBound = FreeCAD.Vector(100.*float(i)/float(N-1), -180, 0)
+                upperBound = FreeCAD.Vector(100.*float(i)/float(N-1), 180, 0)
+                constLine = Part.LineSegment(lowerBound, upperBound)
+                
+                alphaIntersect = alphaCurve.intersectCC(constLine)
+                alphaCurveDiscret.append(alphaIntersect)
 
-			# Streamline
-			list_of_vectors = []
-			for i in range (0, N, 1):
-				vector = FreeCAD.Vector(coord_x[i],coord_y[i], coord_z[i])
-				list_of_vectors.append(vector)
+            for i in range(0, N, 1):
+                discretPtsXDistance = DiscretEdgeListRelative[i].x - DiscretEdgeList[i].x
+                discretPtsYDistance = DiscretEdgeListRelative[i].y - DiscretEdgeList[i].y
 
-			streamline = Part.BSplineCurve()
-			streamline.interpolate(list_of_vectors)
-			return streamline.toShape(), betai, dThetaSum
-######################################THE END OF THIS FUNCTION ##########################################################
+                discretPtsDistance = np.sqrt(np.power(discretPtsXDistance, 2) + np.power(discretPtsYDistance, 2))
+                
+                gammaDiscret.append(2*np.arcsin(discretPtsDistance*np.tan(np.pi*alphaIntersect[0].Y/180.)/(2*DiscretEdgeList[i].y)))
+        
+            physCoordList = []
+            rotMat = lambda gamma: np.array([[1, 0, 0], [0, np.cos(gamma), np.sin(gamma)], [0, -1*np.sin(gamma), np.cos(gamma)]])
+            for i in range(0, N, 1):
+                physCoord = FreeCAD.Vector(np.dot(rotMat(-np.pi*thetaiRelative[i]/180.+gammaDiscret[i]), DiscretEdgeList[i]))
+                physCoordList.append(physCoord)
 
-######################################THIS FUNCTION CREATES A CHART OF THE PARAMETERS STREAMLINE#########################
-		def chartBetaTheta (betai, dThetaSum, AnglesChart):
-			if AnglesChart ==True:
-				x_streamline = np.linspace(0, 1, N)
-				y_beta = betai
-				y_theta = [0.0]
-				for i in range(0, (N-1), 1):
-					y = y_theta.append(dThetaSum[i])
-				plt.plot(x_streamline, y_beta, x_streamline, y_theta)
-				plt.xlabel("Streamline from 0 to 1")
-				plt.ylabel("Angle Beta and Angle Theta, [degree]")
-				plt.legend(["Beta angle","Theta angle = "+"%.2f" %dThetaSum[-1]], loc='upper right', bbox_to_anchor=(0.5, 1.00))
-				plt.grid()
-				plt.show()
-#####################################THE END OF THIS FUNCTION ###########################################################
-		streamlineShroud, betaiShroud, dThetaShroudSum = streamlineBlade(obj.AngleBeta1Shroud, obj.AngleBetaPoint1Shroud, obj.AngleBetaPoint2Shroud, obj.AngleBeta2Shroud, shroudEdgeDiscret)
-		streamlineShroudDisc = streamlineShroud.discretize(Number = 10)
-		streamlineShroudBad = Part.BSplineCurve()
-		streamlineShroudBad.interpolate(streamlineShroudDisc)
-
-		streamlineHub, betaiHub, dThetaHubSum = streamlineBlade(obj.AngleBeta1Hub, obj.AngleBetaPoint1Hub, obj.AngleBetaPoint2Hub, obj.AngleBeta2Hub, hubEdgeDiscret)
-		streamlineHubDisc = streamlineHub.discretize(Number = 10)
-		streamlineHubBad = Part.BSplineCurve()
-		streamlineHubBad.interpolate(streamlineHubDisc)
-
-		chartShroud = chartBetaTheta(betaiShroud, dThetaShroudSum, obj.AnglesChartShroud)
-		chartHub = chartBetaTheta(betaiHub, dThetaHubSum, obj.AnglesChartHub)
-#################################################################################################################
-
-		if Mer.CylindricalBlades == False:
-			aveCurveEdge = Mer.Shape.Edges[11]
-			aveCurveEdgeDiscret = aveCurveEdge.discretize(Number = obj.N)
-			aveCurveEdgeDiscret.append(aveCurveEdge.lastVertex().Point)
-
-			streamlineAverage, betaiAve, dThetaAveSum = streamlineBlade(obj.AngleBeta1Ave, obj.AngleBetaPoint1Ave, obj.AngleBetaPoint2Ave, obj.AngleBeta2Ave, aveCurveEdgeDiscret)
-			streamlineAverageDisc = streamlineAverage.discretize(Number = 10)
-			streamlineAveBad = Part.BSplineCurve()
-			streamlineAveBad.interpolate(streamlineAverageDisc)	
-
-			chartAve = chartBetaTheta(betaiAve, dThetaAveSum, obj.AnglesChartAverage)
-			
-			c = Part.makeLoft([streamlineShroudBad.toShape(), streamlineAveBad.toShape(),streamlineHubBad.toShape()])
-
-		else:
-			c = Part.makeLoft([streamlineShroudBad.toShape(), streamlineHubBad.toShape()])
+            streamline = Part.BSplineCurve()
+            streamline.interpolate(physCoordList)
+            
+            return streamline.toShape()
 
 
-##########################################################################################################
-	
-		obj.Shape = c
+        streamlineHub, betaiHub, thetaiHub = streamlineBladeByBeta([obj.AngleBetaPoint1Hub, obj.AngleBetaPoint2Hub, obj.AngleBetaPoint3Hub], obj.AngleBeta1Hub, obj.AngleBeta2Hub, hubEdgeDiscret)       
+        streamlineShroud, betaiShroud, thetaiShroud = streamlineBladeByBeta([obj.AngleBetaPoint1Shroud, obj.AngleBetaPoint2Shroud, obj.AngleBetaPoint3Shroud], obj.AngleBeta1Shroud, obj.AngleBeta2Shroud, shroudEdgeDiscret)
+        #streamlineShroud = relativeStreamlineByAlpha([obj.AngleAlphaPoint1, obj.AngleAlphaPoint2, obj.AngleAlphaPoint3], obj.AngleAlpha1, obj.AngleAlpha2, shroudEdgeDiscret, hubEdgeDiscret, thetaiHub)
+       
+        streamlineHubBSpline = Part.BSplineCurve()
+        streamlineShroudBSpline = Part.BSplineCurve()
+
+        streamlineHubBSpline.interpolate(streamlineHub.discretize(Number = 10))
+        streamlineShroudBSpline.interpolate(streamlineShroud.discretize(Number = 10))
+        
+        # Two options available: using beta profile only, using both beta and alpha profile
+        bladeSurf = Part.makeLoft([streamlineShroudBSpline.toShape(), streamlineHubBSpline.toShape()])
+        
+        obj.Shape = bladeSurf
 
 class Blades:
-	def __init__(self, obj):
-		obj.Proxy = self
-		obj.addProperty("App::PropertyFloat", "ThicknessLEShroud", "Shroud profile", "Value of the LE")
-		# obj.addProperty("App::PropertyVector", "ThicknessPoint1Shroud", "Shroud profile", "Point for B-Spline thickness")
-		# obj.addProperty("App::PropertyVector", "ThicknessPoint2Shroud", "Shroud profile", "Point for B-Spline thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessPoint1Shroud", "Shroud profile", "Point for B-Spline thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessPoint2Shroud", "Shroud profile", "Point for B-Spline thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessTEShroud", "Shroud profile", "Value of the TE")
-
-		obj.addProperty("App::PropertyFloat", "ThicknessLEHub", "Hub profile", "Value of the thickness LE")
-		# obj.addProperty("App::PropertyVector", "ThicknessPoint1Hub", "Hub profile", "Point for B-Spline thickness")
-		# obj.addProperty("App::PropertyVector", "ThicknessPoint2Hub", "Hub profile", "Point for B-Spline thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessPoint1Hub", "Hub profile", "Point for B-Spline thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessPoint2Hub", "Hub profile", "Point for B-Spline thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessTEHub", "Hub profile", "Value of the thickness TE")
-
-		obj.addProperty("App::PropertyFloat", "ThicknessLEAve", "Average profile", "Value of the thickness LE")
-		# obj.addProperty("App::PropertyVector", "ThicknessPoint1Ave", "Average profile", "Value of the thickness")
-		# obj.addProperty("App::PropertyVector", "ThicknessPoint2Ave", "Average profile", "Value of The thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessPoint1Ave", "Average profile", "Value of the thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessPoint2Ave", "Average profile", "Value of The thickness")
-		obj.addProperty("App::PropertyFloat", "ThicknessTEAve", "Average profile", "Value of the thickness TE")
-
-		obj.addProperty("App::PropertyBool", "TraillingEdgeEllipse", "Type of the LE and TE", "Type of the trailling edge")
-		obj.addProperty("App::PropertyInteger", "LeadingEdgeType", "Type of the LE and TE", "Type of the leading edge")
-		obj.addProperty("App::PropertyInteger", "TraillingEdgeType", "Type of the LE and TE", "Type of the trailling edge")
-		obj.addProperty("App::PropertyInteger", "NumberOfBlades", "Number of blades")
-
-		obj.addProperty("App::PropertyBool", "FullDomainCFD", "CFD", "Create full CFD Domain")
-		obj.addProperty("App::PropertyBool", "PeriodicDomainCFD", "CFD", "Create periodic CFD Domain")
-		obj.addProperty("App::PropertyFloat", "HalfD3toD2", "CFD", "Value of half relationship D3/D2")
-
-
-	def execute (self, obj):
-		# Creation of the profile of streamlines:
-		BladeFace = Blade.Shape.Faces[0]
-		BladeSurface = BladeFace.Surface
-		BladeEdgeShroud = BladeFace.Edges[0]
-		BladeEdgeHub = BladeFace.Edges[2]
-
-		BladeEdgeTe = BladeFace.Edges[1]
-
-		R2 = Mer.D2/2.
-		R0 = Mer.D0/2.
-		r0 = Mer.d0/2.
-
-		def thicknessProfile (ThicknessLE, ThicknessPoint1, ThicknessPoint2, ThicknessTE, BladeStreamlineEdge, BladeFace, BladeSurface, NameOfDisk, EdgeTe, LECoeff1, TECoeff1,TraillingEdgeEllipse, UVoutlet, Extend):	
-			BladesEdgeDicretForLe = BladeStreamlineEdge.discretize(Distance = ThicknessLE/4.)
-			BladesEdgeDicretForSide = BladeStreamlineEdge.discretize(Number = 20)
-
-			if Mer.CylindricalBlades == False:
-				BladesEdgeDicret = []
-				for i in range (0, 10, 1):
-					BladesEdgeDicret.append(BladesEdgeDicretForLe[i])
-
-				for i in range (3, len(BladesEdgeDicretForSide), 1):
-					BladesEdgeDicret.append(BladesEdgeDicretForSide[i])
-
-				OutletVector = BladeFace.valueAt(Extend, UVoutlet)
-
-				BladesEdgeDicret.append(OutletVector)
-			else:
-				BladesEdgeDicret = []
-				for i in range (0, 10, 1):
-					BladesEdgeDicret.append(BladesEdgeDicretForLe[i])
-
-				for i in range (3, len(BladesEdgeDicretForSide), 1):
-					BladesEdgeDicret.append(BladesEdgeDicretForSide[i])
-
-				OutletVector = BladeFace.valueAt(1.1*BladeEdgeShroud.Length, UVoutlet)
-
-				BladesEdgeDicret.append(OutletVector)
-
-	#################
-			# Creation of Thickness curve of the Shroud
-			ThicknessPoints = [FreeCAD.Vector(0, ThicknessLE, 0), FreeCAD.Vector(40, ThicknessPoint1, 0), FreeCAD.Vector(75, ThicknessPoint2, 0), FreeCAD.Vector(100, ThicknessTE, 0)]
-			ThicknessCurve = Part.BSplineCurve()
-			ThicknessCurve.interpolate(ThicknessPoints)
-			ThicknessCurveDiscret = []
-			for i in range (0, len(BladesEdgeDicret), 1):
-				vector_line1 = FreeCAD.Vector(float(i)/(float(len(BladesEdgeDicret))/100.), -180, 0)
-				vector_line2 = FreeCAD.Vector(float(i)/(float(len(BladesEdgeDicret))/100.), 180, 0)
-				line = Part.LineSegment(vector_line1, vector_line2)
-				ThicknessIntersect = ThicknessCurve.intersectCC(line)
-				ThicknessCurveDiscret.append(ThicknessIntersect)
-
-				vu = []
-			for i in range (0, len(BladesEdgeDicret), 1):
-				vuVector = BladeSurface.parameter(BladesEdgeDicret[i])
-				vu.append(vuVector)
-
-			 				
-
-			normalPressure = []
-			for i in range (0, len(vu), 1):
-				normalVector = BladeFace.normalAt(vu[i][0], vu[i][1])
-				normalPressure.append(normalVector.normalize())
-
-			normalSuction = []
-			for i in range (0, len(vu), 1):
-				normalVector = BladeFace.normalAt(vu[i][0], vu[i][1])
-				normalSuction.append(normalVector.normalize())
-
-			if TraillingEdgeEllipse == False:
-
-				pressureSide = []
-				for i in range (2*LECoeff1, len(normalPressure), 1):
-					vectorPressureSide = normalPressure[i]
-					valueThickness = ThicknessCurveDiscret[i][0]
-					vectorPressureSide = vectorPressureSide.multiply(valueThickness.Y/2.)
-					vectorPressureSide = vectorPressureSide.add(BladesEdgeDicret[i])
-					pressureSide.append(vectorPressureSide)
-
-				suctionSide = []
-				for i in range (2*LECoeff1, len(normalSuction), 1):
-					vectorSuctionSide = normalSuction[i]
-					valueThickness = ThicknessCurveDiscret[i][0]
-					vectorSuctionSide = vectorSuctionSide.multiply(-valueThickness.Y/2.)
-					vectorSuctionSide = vectorSuctionSide.add(BladesEdgeDicret[i])
-					suctionSide.append(vectorSuctionSide)
-
-			else:
-
-				pressureSide = []
-				for i in range (2*LECoeff1, len(normalPressure)-2*TECoeff1, 1):
-					vectorPressureSide = normalPressure[i]
-					valueThickness = ThicknessCurveDiscret[i][0]
-					vectorPressureSide = vectorPressureSide.multiply(valueThickness.Y/2.)
-					vectorPressureSide = vectorPressureSide.add(BladesEdgeDicret[i])
-					pressureSide.append(vectorPressureSide)
-
-				suctionSide = []
-				for i in range (2*LECoeff1, len(normalSuction)-2*TECoeff1, 1):
-					vectorSuctionSide = normalSuction[i]
-					valueThickness = ThicknessCurveDiscret[i][0]
-					vectorSuctionSide = vectorSuctionSide.multiply(-valueThickness.Y/2.)
-					vectorSuctionSide = vectorSuctionSide.add(BladesEdgeDicret[i])
-					suctionSide.append(vectorSuctionSide)
-
-
-			# Points of the LE Shroud curve
-			LePointsList = []
-
-			for i in range (1, LECoeff1*2):
-				lengthLePi = ThicknessLE/2*np.sqrt(1.-(i*ThicknessLE/4.)**2/(float(LECoeff1)/2.*ThicknessLE)**2)
-				LePointsList.append(lengthLePi)
-			LePointsList.reverse()
-
-			LeCurvePressure = [BladesEdgeDicret[0]]
-			for i in range (1, len(LePointsList)+1):
-				vectorPressureLe = normalPressure[i]
-				vectorPressureLe = vectorPressureLe.multiply(LePointsList[i-1])
-				vectorPressureLe = vectorPressureLe.add(BladesEdgeDicret[i])
-				LeCurvePressure.append(vectorPressureLe)
-			LeCurvePressure.append(pressureSide[0])
-			LeCurvePressure.reverse()
-
-			LeCurveSuction = []
-			for i in range (1, len(LePointsList)+1):
-				vectorSuctionLe = normalSuction[i]
-				vectorSuctionLe = vectorSuctionLe.multiply(-LePointsList[i-1])
-				vectorSuctionLe = vectorSuctionLe.add(BladesEdgeDicret[i])
-				LeCurveSuction.append(vectorSuctionLe)
-			LeCurveSuction.append(suctionSide[0])
-			
-			Le = LeCurvePressure+LeCurveSuction
-
-			# Line of the TE Shroud curve
-			if TraillingEdgeEllipse == False:
-			
-				TeP1 = pressureSide[-1]
-				TeP2 = suctionSide[-1]
-				TeSpline = Part.LineSegment(TeP1, TeP2)
-		
-			else:
-########################################## For realization ####################				
-				TePointsList = []
-
-				for i in range (1, TECoeff1*2):
-					lengthTePi = ThicknessTE/2*np.sqrt(1.-(i*ThicknessTE/4.)**2/(float(TECoeff1)/2.*ThicknessTE)**2)
-					TePointsList.append(lengthTePi)
-				TePointsList.reverse()
-
-				TeCurvePressure = [BladesEdgeDicret[-1]]
-				for i in range (-2, -len(TePointsList)-2, -1):
-					vectorPressureTe = normalPressure[i]
-					vectorPressureTe = vectorPressureTe.multiply(TePointsList[-i-2])
-					vectorPressureTe = vectorPressureTe.add(BladesEdgeDicret[i])
-					TeCurvePressure.append(vectorPressureTe)
-				TeCurvePressure.append(pressureSide[-1])
-				TeCurvePressure.reverse()
-
-				TeCurveSuction = []
-				for i in range (-2, -len(TePointsList)-2, -1):
-					vectorSuctionTe = normalSuction[i]
-					vectorSuctionTe = vectorSuctionTe.multiply(-TePointsList[-i-2])
-					vectorSuctionTe = vectorSuctionTe.add(BladesEdgeDicret[i])
-					TeCurveSuction.append(vectorSuctionTe)
-				TeCurveSuction.append(suctionSide[-1])
-				
-				Te = TeCurvePressure+TeCurveSuction
-				TeSpline = Part.BSplineCurve()
-				TeSpline.interpolate(Te)
-################################################### THE END ######################
-
-			pressureSide2 = Part.BSplineCurve()
-			pressureSide2.interpolate(pressureSide)
-			suctionSide2 = Part.BSplineCurve()
-			suctionSide2.interpolate(suctionSide)
-
-			pressureSide2Discr = pressureSide2.discretize(Number = 100)
-			suctionSide2Discr = suctionSide2.discretize(Number = 100)
-
-
-
-			e = Part.BSplineCurve()
-			e.interpolate(pressureSide2Discr)
-			e2 = Part.BSplineCurve()
-			e2.interpolate(suctionSide2Discr)
-			e3 = Part.BSplineCurve()
-			e3.interpolate(Le)
-
-
-			w = Part.Wire([e3.toShape(), e.toShape(), e2.toShape(), TeSpline.toShape()])
-
-			return w
-
-
-##########################################################################
-
-
-		
-
-		ShroudProfile = thicknessProfile(obj.ThicknessLEShroud, obj.ThicknessPoint1Shroud, obj.ThicknessPoint2Shroud, obj.ThicknessTEShroud, BladeEdgeShroud, BladeFace, BladeSurface, "Hub", BladeEdgeTe, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 0.0, 1.05)
-		HubProfile = thicknessProfile(obj.ThicknessLEHub, obj.ThicknessPoint1Hub, obj.ThicknessPoint2Hub, obj.ThicknessTEHub, BladeEdgeHub, BladeFace, BladeSurface, "Shroud", BladeEdgeTe, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 1.0, 1.05)
-
-		### execute에 포함된 내용
-		BladeEdgeShroudDiscret = BladeEdgeShroud.discretize(Distance = obj.ThicknessLEShroud/4.)
-
-		uv = []
-		for i in range (0, len(BladeEdgeShroudDiscret), 1):
-			uv_value = BladeSurface.parameter(BladeEdgeShroudDiscret[i])
-			uv.append(uv_value)
-
-		tangentShroud = []
-		for i in range (0, len(BladeEdgeShroudDiscret), 1):
-			tangentVector = BladeFace.tangentAt(uv[i][0], uv[i][1])
-			tangentShroud.append(tangentVector)
-
-		curveShroud2 = []
-		for i in range (0, len(BladeEdgeShroudDiscret), 1):
-			vectorCurveShroud = tangentShroud[i][1]
-			valueTranslate = obj.ThicknessLEShroud*1.5
-			vectorCurveShroud = vectorCurveShroud.multiply(-valueTranslate)
-			vectorCurveShroud = vectorCurveShroud.add(BladeEdgeShroudDiscret[i])
-			curveShroud2.append(vectorCurveShroud)
-		
-		splineShroud2 = Part.BSplineCurve()
-		splineShroud2.interpolate(curveShroud2)
-
-
-
-		BladeEdgeHubDiscret = BladeEdgeHub.discretize(Distance = obj.ThicknessLEHub/4.)
-
-		uvHub = []
-		for i in range (0, len(BladeEdgeHubDiscret), 1):
-			uv_valueHub = BladeSurface.parameter(BladeEdgeHubDiscret[i])
-			uvHub.append(uv_valueHub)		
-
-		tangentHub = []
-		for i in range (0, len(BladeEdgeHubDiscret), 1):
-			tangentVectorHub = BladeFace.tangentAt(uvHub[i][0], uvHub[i][1])
-			tangentHub.append(tangentVectorHub)
-
-		curveHub2 = []
-		for i in range (0, len(BladeEdgeHubDiscret), 1):
-			vectorCurveHub = tangentHub[i][1]
-			valueTranslate = obj.ThicknessLEHub
-			vectorCurveHub = vectorCurveHub.multiply(valueTranslate)
-			vectorCurveHub = vectorCurveHub.add(BladeEdgeHubDiscret[i])
-			curveHub2.append(vectorCurveHub)
-		splineHub2 = Part.BSplineCurve()
-		splineHub2.interpolate(curveHub2)
-		BladeEdgeHubReverse = BladeEdgeHub.reverse()
-
-		faceShroud2 = Part.makeRuledSurface(splineShroud2.toShape(), BladeEdgeShroud)
-		faceHub2 = Part.makeRuledSurface(BladeEdgeHub, splineHub2.toShape())
-
-		BladeEdgeTeShroud2 = faceShroud2.Edges[1]
-		BladeEdgeTeHub2 = faceHub2.Edges[1] 
-
-		ShroudProfile2 = thicknessProfile(obj.ThicknessLEShroud, obj.ThicknessPoint1Shroud, obj.ThicknessPoint2Shroud, obj.ThicknessTEShroud, splineShroud2, faceShroud2, faceShroud2.Surface, "Hub", BladeEdgeTeShroud2, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 0.0, BladeEdgeShroud.Length*1.05)
-		HubProfile2 = thicknessProfile(obj.ThicknessLEHub, obj.ThicknessPoint1Hub, obj.ThicknessPoint2Hub, obj.ThicknessTEHub, splineHub2, faceHub2, faceHub2.Surface, "Shroud", BladeEdgeTeHub2, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 1.0, BladeEdgeHub.Length*1.05)
-
-		if Mer.CylindricalBlades == False:
-
-			# Creation of the average streamline in surface blade
-			aveMerLine = Mer.Shape.Edges[11]
-			revolveAveLine = aveMerLine.revolve(FreeCAD.Vector(0, 0, 0), FreeCAD.Vector(1, 0, 0), 360)
-
-			aveCurveIntersect = revolveAveLine.Surface.intersectSS(BladeSurface)
-			aveCurve = aveCurveIntersect[0]
-
-			AveProfile = thicknessProfile(obj.ThicknessLEAve, obj.ThicknessPoint1Ave, obj.ThicknessPoint2Ave, obj.ThicknessTEAve, aveCurve, BladeFace, BladeSurface, "Average", BladeEdgeTe, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 0.5, 1.05)
-			BladeSurfaceModel = Part.makeLoft([ShroudProfile2,AveProfile, HubProfile2])
-		else:
-			BladeSurfaceModel = Part.makeLoft([ShroudProfile2, HubProfile2])
-
-		if obj.TraillingEdgeEllipse == False:
-
-			ListEdges1 = [BladeSurfaceModel.Edges[0], BladeSurfaceModel.Edges[4], BladeSurfaceModel.Edges[7], BladeSurfaceModel.Edges[10]]
-			Surface1 = Part.makeFilledFace(ListEdges1)
-
-			ListEdges2 = [BladeSurfaceModel.Edges[2], BladeSurfaceModel.Edges[6], BladeSurfaceModel.Edges[9], BladeSurfaceModel.Edges[11]]
-			Surface2 = Part.makeFilledFace(ListEdges2)
-			
-			ListSurfaces = Part.Compound([BladeSurfaceModel.Faces[0], BladeSurfaceModel.Faces[1], BladeSurfaceModel.Faces[2], BladeSurfaceModel.Faces[3], Surface1, Surface2])
-			ListSurfaces.removeSplitter()
-			BladeShell = Part.makeShell(ListSurfaces.Faces)
-			BladeShell.removeSplitter()
-			BladeSolidInit = Part.makeSolid(BladeShell)
-
-		# Cut of the TE 
-
-		LineShroudBlock = Part.LineSegment(FreeCAD.Vector(Mer.L/2, R2), FreeCAD.Vector(Mer.L/2, R2*1.2))
-		LineHubBlock = Part.LineSegment(FreeCAD.Vector((Mer.L+Mer.b2)*2, R2), FreeCAD.Vector((Mer.L+Mer.b2)*2, R2*1.2))
-		LineTopBlock = Part.LineSegment(FreeCAD.Vector(Mer.L/2, R2*1.2), FreeCAD.Vector((Mer.L+Mer.b2)*2, R2*1.2))
-		LineDownBlock = Part.LineSegment(FreeCAD.Vector(Mer.L/2, R2), FreeCAD.Vector((Mer.L+Mer.b2)*2, R2))
-
-		FaceShroudBlock = LineShroudBlock.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-		FaceHubBlock = LineHubBlock.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-		FaceTopBlock = LineTopBlock.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-		FaceDownBlock = LineDownBlock.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-
-		BlockShell = Part.makeShell([FaceShroudBlock, FaceHubBlock, FaceTopBlock, FaceDownBlock])
-		BlockSolid = Part.makeSolid(BlockShell)
-
-		BladeSolidSecond = BladeSolidInit.cut(BlockSolid)
-
-
-		if obj.FullDomainCFD == False and obj.PeriodicDomainCFD == False:
-			#Cut of the Shroud Side of Blade 
-			FaceShroudCut =Mer.Shape.Faces[0]		
-			LineTopShroudCut = Part.LineSegment(FreeCAD.Vector(Mer.L, R2, 0), FreeCAD.Vector(0, R2, 0))
-			FaceTopShroudCut = LineTopShroudCut.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-			LineInletShroudCut = Part.LineSegment(FreeCAD.Vector(0, R2, 0), FreeCAD.Vector(0, R0, 0))
-			FaceInletShroudCut = LineInletShroudCut.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-
-			ShroudCutBLockShell = Part.makeShell([FaceShroudCut, FaceTopShroudCut, FaceInletShroudCut])
-			ShroudCutBLockSolid = Part.makeSolid(ShroudCutBLockShell)
-
-			BladeSolidThree = BladeSolidSecond.cut(ShroudCutBLockSolid)
-
-			# Cut of the Hub Side Of Blade
-			Cut1 = Part.LineSegment(FreeCAD.Vector(0,0,0),FreeCAD.Vector(0,(Mer.ds+Mer.d0)/4.,0))
-			Rot1 = Cut1.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-			Cut2 = Part.LineSegment(FreeCAD.Vector(0,(Mer.ds+Mer.d0)/4.,0),FreeCAD.Vector(Mer.L+Mer.b2+Mer.ThicknessHub/2.,(Mer.ds+Mer.d0)/4.,0))
-			Rot2 = Cut2.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-			Cut3 = Part.LineSegment(FreeCAD.Vector(Mer.L+Mer.b2+Mer.ThicknessHub/2.,(Mer.ds+Mer.d0)/4.,0),FreeCAD.Vector(Mer.L+Mer.b2+Mer.ThicknessHub/2.,Mer.D2/2.,0))
-			Rot3 = Cut3.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-			Cut4 = Part.LineSegment(FreeCAD.Vector(Mer.L+Mer.b2+Mer.ThicknessHub/2.,Mer.D2/2.,0),FreeCAD.Vector(Mer.L+2*Mer.b2+Mer.ThicknessHub,Mer.D2/2.,0))
-			Rot4 = Cut4.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-			Cut5 = Part.LineSegment(FreeCAD.Vector(Mer.L+2*Mer.b2+Mer.ThicknessHub,Mer.D2/2.,0),FreeCAD.Vector(Mer.L+2*Mer.b2+Mer.ThicknessHub,0,0))
-			Rot5 = Cut5.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-			HubCutBLockShell = Part.makeShell([Rot1, Rot2, Rot3, Rot4, Rot5])
-			HubCutBLockSolid = Part.makeSolid(HubCutBLockShell)	
-
-			BladeSolid = BladeSolidThree.cut(HubCutBLockSolid)	
-
-			BladesList = []
-
-		# Creation of a massive of blades		
-			AngleRotateBlade = 360./float(obj.NumberOfBlades)
-			# BladesList = []
-			for i in range (0, obj.NumberOfBlades, 1):
-				BladeSolidi = BladeSolid.copy()
-				BladeSolidi.rotate(FreeCAD.Vector(0, 0, 0), FreeCAD.Vector(1, 0, 0), AngleRotateBlade*(i+0.5))
-				BladesList.append(BladeSolidi)
-
-		elif obj.FullDomainCFD==True and obj.PeriodicDomainCFD == False:### Full Domain CFD 형상
-		# Creation of a massive of blades without cut of shroud and hub parts
-			AngleRotateBlade = 360./float(obj.NumberOfBlades)
-			Blades = []
-			for i in range (0, obj.NumberOfBlades, 1):
-				BladeSolidi = BladeSolidSecond.copy()
-				BladeSolidi.rotate(FreeCAD.Vector(0, 0, 0), FreeCAD.Vector(1, 0, 0), AngleRotateBlade*(i+0.5))
-				Blades.append(BladeSolidi)
-		# Creation of a CFD part without blades
-			FaceShroudCut =Mer.Shape.Faces[0]
-			FaceHubCut = Mer.Shape.Faces[1]
-
-			EdgeInlet = Part.LineSegment(FreeCAD.Vector(0,r0,0), FreeCAD.Vector(0,R0, 0))
-			FaceInlet = EdgeInlet.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-
-			EdgeShroud2 = Part.LineSegment(FreeCAD.Vector(Mer.L, R2, 0), FreeCAD.Vector(Mer.L, R2*obj.HalfD3toD2, 0))
-			FaceShroud2 = EdgeShroud2.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-
-			EdgeHub2 = Part.LineSegment(FreeCAD.Vector(Mer.L+Mer.b2, R2, 0), FreeCAD.Vector(Mer.L+Mer.b2, R2*obj.HalfD3toD2, 0))
-			FaceHub2 = EdgeHub2.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-
-			EdgeOutlet = Part.LineSegment(FreeCAD.Vector(Mer.L, R2*obj.HalfD3toD2, 0), FreeCAD.Vector(Mer.L+Mer.b2, R2*obj.HalfD3toD2, 0))
-			FaceOutlet = EdgeOutlet.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-
-			CFDDomainShell = Part.makeShell([FaceInlet, FaceShroudCut, FaceShroud2, FaceOutlet, FaceHub2, FaceHubCut])
-			CFDDomainSolid = Part.makeSolid(CFDDomainShell)
-			CFDDomainSolid.rotate(FreeCAD.Vector(0, 0, 0), FreeCAD.Vector(1, 0, 0), -(360/obj.NumberOfBlades)/2)
-
-			CFDDomain = CFDDomainSolid.cut(Part.Compound(Blades))
-
-			BladesList = [CFDDomain]
-
-		elif obj.FullDomainCFD==False and obj.PeriodicDomainCFD == True:###Periodic Domain CFD 형상
-		# Creation Periodic CFD Domain
-			AngleRotateFacePeriodic = 180./float(obj.NumberOfBlades)
-
-			EdgeInlet = Part.LineSegment(FreeCAD.Vector(0,r0,0), FreeCAD.Vector(0,R0, 0)).toShape()
-			EdgeShroud = Mer.Shape.Edges[2]
-			EdgeHub = Mer.Shape.Edges[6]
-			EdgeLE = Blade.Shape.Edges[3]
-			WireInlet = Part.Wire([EdgeInlet, EdgeShroud, EdgeLE, EdgeHub])
-			FaceInletCFD = Part.Face(WireInlet)
-
-
-			FacePeriodic1 = BladeFace.copy()
-			FacePeriodic1.rotate(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), AngleRotateFacePeriodic)
-			FaceInletCFD.rotate(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), AngleRotateFacePeriodic)
-
-
-			CFDSolid1 = FacePeriodic1.revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), -2*AngleRotateFacePeriodic)
-			CFDSolid2 = FaceInletCFD.revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), -2*AngleRotateFacePeriodic)
-			
-		
-		# Creation of the outlet part of periodic CFD domain
-			EdgeFirstOut = CFDSolid1.Edges[1]
-			VertexFirstOut = EdgeFirstOut.firstVertex()
-			VectorFirstOut = VertexFirstOut.Point
-			VectorFirstZero = FreeCAD.Vector(Mer.L,0,0)
-			LineFirstOut = Part.LineSegment(VectorFirstZero, VectorFirstOut).toShape()
-			VectorFirstOutAdd = LineFirstOut.valueAt(LineFirstOut.Length*obj.HalfD3toD2)
-			LineFirstOutAdd = Part.LineSegment(VectorFirstOut, VectorFirstOutAdd).toShape()
-
-			EdgeSecondOut = CFDSolid1.Edges[4]
-			VertexSecondOut = EdgeSecondOut.firstVertex()
-			VectorSecondOut = VertexSecondOut.Point
-			VectorSecondZero = FreeCAD.Vector(Mer.L+Mer.b2, 0, 0)
-			LineSecondOut = Part.LineSegment(VectorSecondZero, VectorSecondOut).toShape()
-			VectorSecondOutAdd = LineSecondOut.valueAt(LineSecondOut.Length*obj.HalfD3toD2)
-			LineSecondOutAdd = Part.LineSegment(VectorSecondOut, VectorSecondOutAdd).toShape()
-
-			LineOutlet = Part.LineSegment(VectorFirstOutAdd, VectorSecondOutAdd).toShape()
-			ListEdgesOutletBlock = [CFDSolid1.Edges[5], LineFirstOutAdd, LineSecondOutAdd, LineOutlet]
-			FaceOutBlock = Part.makeFilledFace(ListEdgesOutletBlock)
-
-			SolidOutletCFD = FaceOutBlock.revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), -2*AngleRotateFacePeriodic)
-			
-
-			CFDSolid3 = CFDSolid1.fuse(CFDSolid2)
-			CFDSolid = CFDSolid3.fuse(SolidOutletCFD)
-			CFDSolid = CFDSolid.cut(BladeSolidSecond)
-			BladesList = [CFDSolid]
-
-
-		obj.Shape = Part.Compound(BladesList)
+    def __init__(self, obj):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyFloat", "ThicknessLEShroud", "Shroud profile", "Value of the LE").ThicknessLEShroud = 1.3
+        obj.addProperty("App::PropertyFloat", "ThicknessPoint1Shroud", "Shroud profile", "Point for B-Spline thickness").ThicknessPoint1Shroud = 1.3
+        obj.addProperty("App::PropertyFloat", "ThicknessPoint2Shroud", "Shroud profile", "Point for B-Spline thickness").ThicknessPoint2Shroud = 1.3
+        obj.addProperty("App::PropertyFloat", "ThicknessTEShroud", "Shroud profile", "Value of the TE").ThicknessTEShroud = 1.3
+
+        obj.addProperty("App::PropertyFloat", "ThicknessLEHub", "Hub profile", "Value of the thickness LE").ThicknessLEHub = 3.0
+        obj.addProperty("App::PropertyFloat", "ThicknessPoint1Hub", "Hub profile", "Point for B-Spline thickness").ThicknessPoint1Hub = 3.0
+        obj.addProperty("App::PropertyFloat", "ThicknessPoint2Hub", "Hub profile", "Point for B-Spline thickness").ThicknessPoint2Hub = 3.0
+        obj.addProperty("App::PropertyFloat", "ThicknessTEHub", "Hub profile", "Value of the thickness TE").ThicknessTEHub = 3.0
+
+        obj.addProperty("App::PropertyBool", "TraillingEdgeEllipse", "Type of the LE and TE", "Type of the trailling edge").TraillingEdgeEllipse = False
+        obj.addProperty("App::PropertyInteger", "LeadingEdgeType", "Type of the LE and TE", "Type of the leading edge").LeadingEdgeType = 1
+        obj.addProperty("App::PropertyInteger", "TraillingEdgeType", "Type of the LE and TE", "Type of the trailling edge" ).TraillingEdgeType = 1
+        obj.addProperty("App::PropertyInteger", "NumberOfBlades", "Number of blades").NumberOfBlades=24
+
+        obj.addProperty("App::PropertyBool", "FullDomainCFD", "CFD", "Create full CFD Domain").FullDomainCFD = False
+        obj.addProperty("App::PropertyBool", "PeriodicDomainCFD", "CFD", "Create periodic CFD Domain").PeriodicDomainCFD = False
+        obj.addProperty("App::PropertyFloat", "HalfD3toD2", "CFD", "Value of half relationship D3/D2").HalfD3toD2 = 1.2
+
+    def execute (self, obj):
+        Mer = FreeCAD.ActiveDocument.getObject("Meridional")
+        Blade = FreeCAD.ActiveDocument.getObject("ModelOfBlade3D")
+
+        # Creation of the profile of streamlines:
+        BladeFace = Blade.Shape.Faces[0]
+        BladeSurface = BladeFace.Surface
+        BladeEdgeShroud = BladeFace.Edges[0]
+        BladeEdgeHub = BladeFace.Edges[2]
+
+        BladeEdgeTe = BladeFace.Edges[1]
+
+        R2 = Mer.D2/2.
+               
+        def thicknessProfile (ThicknessLE, ThicknessPoint1, ThicknessPoint2, ThicknessTE, BladeStreamlineEdge, BladeFace, BladeSurface, NameOfDisk, EdgeTe, LECoeff1, TECoeff1,TraillingEdgeEllipse, UVoutlet, Extend):	
+            BladesEdgeDicretForLe = BladeStreamlineEdge.discretize(Distance = ThicknessLE/4.)
+            BladesEdgeDicretForSide = BladeStreamlineEdge.discretize(Number = 20)
+
+            BladesEdgeDicret = []
+            for i in range (0, 10, 1):
+                BladesEdgeDicret.append(BladesEdgeDicretForLe[i])
+
+            for i in range (3, len(BladesEdgeDicretForSide), 1):
+                BladesEdgeDicret.append(BladesEdgeDicretForSide[i])
+
+            OutletVector = BladeFace.valueAt(Extend, UVoutlet)
+
+            BladesEdgeDicret.append(OutletVector)
+
+            # Creation of Thickness curve of the Shroud
+            ThicknessPoints = [FreeCAD.Vector(0, ThicknessLE, 0), FreeCAD.Vector(40, ThicknessPoint1, 0), FreeCAD.Vector(75, ThicknessPoint2, 0), FreeCAD.Vector(100, ThicknessTE, 0)]
+            ThicknessCurve = Part.BSplineCurve()
+            ThicknessCurve.interpolate(ThicknessPoints)
+            ThicknessCurveDiscret = []
+            for i in range (0, len(BladesEdgeDicret), 1):
+                vector_line1 = FreeCAD.Vector(float(i)/(float(len(BladesEdgeDicret))/100.), -180, 0)
+                vector_line2 = FreeCAD.Vector(float(i)/(float(len(BladesEdgeDicret))/100.), 180, 0)
+                line = Part.LineSegment(vector_line1, vector_line2)
+                ThicknessIntersect = ThicknessCurve.intersectCC(line)
+                ThicknessCurveDiscret.append(ThicknessIntersect)
+
+                vu = []
+            for i in range (0, len(BladesEdgeDicret), 1):
+                vuVector = BladeSurface.parameter(BladesEdgeDicret[i])
+                vu.append(vuVector)
+
+                            
+
+            normalPressure = []
+            for i in range (0, len(vu), 1):
+                normalVector = BladeFace.normalAt(vu[i][0], vu[i][1])
+                normalPressure.append(normalVector.normalize())
+
+            normalSuction = []
+            for i in range (0, len(vu), 1):
+                normalVector = BladeFace.normalAt(vu[i][0], vu[i][1])
+                normalSuction.append(normalVector.normalize())
+
+            if TraillingEdgeEllipse == False:
+
+                pressureSide = []
+                for i in range (2*LECoeff1, len(normalPressure), 1):
+                    vectorPressureSide = normalPressure[i]
+                    valueThickness = ThicknessCurveDiscret[i][0]
+                    vectorPressureSide = vectorPressureSide.multiply(valueThickness.Y/2.)
+                    vectorPressureSide = vectorPressureSide.add(BladesEdgeDicret[i])
+                    pressureSide.append(vectorPressureSide)
+
+                suctionSide = []
+                for i in range (2*LECoeff1, len(normalSuction), 1):
+                    vectorSuctionSide = normalSuction[i]
+                    valueThickness = ThicknessCurveDiscret[i][0]
+                    vectorSuctionSide = vectorSuctionSide.multiply(-valueThickness.Y/2.)
+                    vectorSuctionSide = vectorSuctionSide.add(BladesEdgeDicret[i])
+                    suctionSide.append(vectorSuctionSide)
+
+            else:
+
+                pressureSide = []
+                for i in range (2*LECoeff1, len(normalPressure)-2*TECoeff1, 1):
+                    vectorPressureSide = normalPressure[i]
+                    valueThickness = ThicknessCurveDiscret[i][0]
+                    vectorPressureSide = vectorPressureSide.multiply(valueThickness.Y/2.)
+                    vectorPressureSide = vectorPressureSide.add(BladesEdgeDicret[i])
+                    pressureSide.append(vectorPressureSide)
+
+                suctionSide = []
+                for i in range (2*LECoeff1, len(normalSuction)-2*TECoeff1, 1):
+                    vectorSuctionSide = normalSuction[i]
+                    valueThickness = ThicknessCurveDiscret[i][0]
+                    vectorSuctionSide = vectorSuctionSide.multiply(-valueThickness.Y/2.)
+                    vectorSuctionSide = vectorSuctionSide.add(BladesEdgeDicret[i])
+                    suctionSide.append(vectorSuctionSide)
+
+
+            # Points of the LE Shroud curve
+            LePointsList = []
+
+            for i in range (1, LECoeff1*2):
+                lengthLePi = ThicknessLE/2*np.sqrt(1.-(i*ThicknessLE/4.)**2/(float(LECoeff1)/2.*ThicknessLE)**2)
+                LePointsList.append(lengthLePi)
+            LePointsList.reverse()
+
+            LeCurvePressure = [BladesEdgeDicret[0]]
+            for i in range (1, len(LePointsList)+1):
+                vectorPressureLe = normalPressure[i]
+                vectorPressureLe = vectorPressureLe.multiply(LePointsList[i-1])
+                vectorPressureLe = vectorPressureLe.add(BladesEdgeDicret[i])
+                LeCurvePressure.append(vectorPressureLe)
+            LeCurvePressure.append(pressureSide[0])
+            LeCurvePressure.reverse()
+
+            LeCurveSuction = []
+            for i in range (1, len(LePointsList)+1):
+                vectorSuctionLe = normalSuction[i]
+                vectorSuctionLe = vectorSuctionLe.multiply(-LePointsList[i-1])
+                vectorSuctionLe = vectorSuctionLe.add(BladesEdgeDicret[i])
+                LeCurveSuction.append(vectorSuctionLe)
+            LeCurveSuction.append(suctionSide[0])
+            
+            Le = LeCurvePressure+LeCurveSuction
+
+            # Line of the TE Shroud curve
+            if TraillingEdgeEllipse == False:
+            
+                TeP1 = pressureSide[-1]
+                TeP2 = suctionSide[-1]
+                TeSpline = Part.LineSegment(TeP1, TeP2)
+        
+            else:
+    ########################################## For realization ####################				
+                TePointsList = []
+
+                for i in range (1, TECoeff1*2):
+                    lengthTePi = ThicknessTE/2*np.sqrt(1.-(i*ThicknessTE/4.)**2/(float(TECoeff1)/2.*ThicknessTE)**2)
+                    TePointsList.append(lengthTePi)
+                TePointsList.reverse()
+
+                TeCurvePressure = [BladesEdgeDicret[-1]]
+                for i in range (-2, -len(TePointsList)-2, -1):
+                    vectorPressureTe = normalPressure[i]
+                    vectorPressureTe = vectorPressureTe.multiply(TePointsList[-i-2])
+                    vectorPressureTe = vectorPressureTe.add(BladesEdgeDicret[i])
+                    TeCurvePressure.append(vectorPressureTe)
+                TeCurvePressure.append(pressureSide[-1])
+                TeCurvePressure.reverse()
+
+                TeCurveSuction = []
+                for i in range (-2, -len(TePointsList)-2, -1):
+                    vectorSuctionTe = normalSuction[i]
+                    vectorSuctionTe = vectorSuctionTe.multiply(-TePointsList[-i-2])
+                    vectorSuctionTe = vectorSuctionTe.add(BladesEdgeDicret[i])
+                    TeCurveSuction.append(vectorSuctionTe)
+                TeCurveSuction.append(suctionSide[-1])
+                
+                Te = TeCurvePressure+TeCurveSuction
+                TeSpline = Part.BSplineCurve()
+                TeSpline.interpolate(Te)
+    ################################################### THE END ######################
+
+            pressureSide2 = Part.BSplineCurve()
+            pressureSide2.interpolate(pressureSide)
+            suctionSide2 = Part.BSplineCurve()
+            suctionSide2.interpolate(suctionSide)
+
+            pressureSide2Discr = pressureSide2.discretize(Number = 100)
+            suctionSide2Discr = suctionSide2.discretize(Number = 100)
+
+
+
+            e = Part.BSplineCurve()
+            e.interpolate(pressureSide2Discr)
+            e2 = Part.BSplineCurve()
+            e2.interpolate(suctionSide2Discr)
+            e3 = Part.BSplineCurve()
+            e3.interpolate(Le)
+
+
+            w = Part.Wire([e3.toShape(), e.toShape(), e2.toShape(), TeSpline.toShape()])
+
+            return w
+
+
+    ##########################################################################
+
+
+        
+
+        ShroudProfile = thicknessProfile(obj.ThicknessLEShroud, obj.ThicknessPoint1Shroud, obj.ThicknessPoint2Shroud, obj.ThicknessTEShroud, BladeEdgeShroud, BladeFace, BladeSurface, "Hub", BladeEdgeTe, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 0.0, 1.05)
+        HubProfile = thicknessProfile(obj.ThicknessLEHub, obj.ThicknessPoint1Hub, obj.ThicknessPoint2Hub, obj.ThicknessTEHub, BladeEdgeHub, BladeFace, BladeSurface, "Shroud", BladeEdgeTe, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 1.0, 1.05)
+
+        ### execute에 포함된 내용
+        BladeEdgeShroudDiscret = BladeEdgeShroud.discretize(Distance = obj.ThicknessLEShroud/4.)
+
+        uv = []
+        for i in range (0, len(BladeEdgeShroudDiscret), 1):
+            uv_value = BladeSurface.parameter(BladeEdgeShroudDiscret[i])
+            uv.append(uv_value)
+
+        tangentShroud = []
+        for i in range (0, len(BladeEdgeShroudDiscret), 1):
+            tangentVector = BladeFace.tangentAt(uv[i][0], uv[i][1])
+            tangentShroud.append(tangentVector)
+
+        curveShroud2 = []
+        for i in range (0, len(BladeEdgeShroudDiscret), 1):
+            vectorCurveShroud = tangentShroud[i][1]
+            valueTranslate = obj.ThicknessLEShroud*1.5
+            vectorCurveShroud = vectorCurveShroud.multiply(-valueTranslate)
+            vectorCurveShroud = vectorCurveShroud.add(BladeEdgeShroudDiscret[i])
+            curveShroud2.append(vectorCurveShroud)
+        
+        splineShroud2 = Part.BSplineCurve()
+        splineShroud2.interpolate(curveShroud2)
+
+        BladeEdgeHubDiscret = BladeEdgeHub.discretize(Distance = obj.ThicknessLEHub/4.)
+
+        uvHub = []
+        for i in range (0, len(BladeEdgeHubDiscret), 1):
+            uv_valueHub = BladeSurface.parameter(BladeEdgeHubDiscret[i])
+            uvHub.append(uv_valueHub)		
+
+        tangentHub = []
+        for i in range (0, len(BladeEdgeHubDiscret), 1):
+            tangentVectorHub = BladeFace.tangentAt(uvHub[i][0], uvHub[i][1])
+            tangentHub.append(tangentVectorHub)
+
+        curveHub2 = []
+        for i in range (0, len(BladeEdgeHubDiscret), 1):
+            vectorCurveHub = tangentHub[i][1]
+            valueTranslate = obj.ThicknessLEHub
+            vectorCurveHub = vectorCurveHub.multiply(valueTranslate)
+            vectorCurveHub = vectorCurveHub.add(BladeEdgeHubDiscret[i])
+            curveHub2.append(vectorCurveHub)
+        splineHub2 = Part.BSplineCurve()
+        splineHub2.interpolate(curveHub2)
+        BladeEdgeHubReverse = BladeEdgeHub.reverse()
+
+        faceShroud2 = Part.makeRuledSurface(splineShroud2.toShape(), BladeEdgeShroud)
+        faceHub2 = Part.makeRuledSurface(BladeEdgeHub, splineHub2.toShape())
+
+        BladeEdgeTeShroud2 = faceShroud2.Edges[1]
+        BladeEdgeTeHub2 = faceHub2.Edges[1] 
+
+        ShroudProfile2 = thicknessProfile(obj.ThicknessLEShroud, obj.ThicknessPoint1Shroud, obj.ThicknessPoint2Shroud, obj.ThicknessTEShroud, splineShroud2, faceShroud2, faceShroud2.Surface, "Hub", BladeEdgeTeShroud2, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 0.0, BladeEdgeShroud.Length*1.05)
+        HubProfile2 = thicknessProfile(obj.ThicknessLEHub, obj.ThicknessPoint1Hub, obj.ThicknessPoint2Hub, obj.ThicknessTEHub, splineHub2, faceHub2, faceHub2.Surface, "Shroud", BladeEdgeTeHub2, obj.LeadingEdgeType, obj.TraillingEdgeType, obj.TraillingEdgeEllipse, 1.0, BladeEdgeHub.Length*1.05)
+        
+        BladeSurfaceModel = Part.makeLoft([ShroudProfile2, HubProfile2])
+
+        if obj.TraillingEdgeEllipse == False:
+
+            ListEdges1 = [BladeSurfaceModel.Edges[0], BladeSurfaceModel.Edges[4], BladeSurfaceModel.Edges[7], BladeSurfaceModel.Edges[10]]
+            Surface1 = Part.makeFilledFace(ListEdges1)
+
+            ListEdges2 = [BladeSurfaceModel.Edges[2], BladeSurfaceModel.Edges[6], BladeSurfaceModel.Edges[9], BladeSurfaceModel.Edges[11]]
+            Surface2 = Part.makeFilledFace(ListEdges2)
+            
+            ListSurfaces = Part.Compound([BladeSurfaceModel.Faces[0], BladeSurfaceModel.Faces[1], BladeSurfaceModel.Faces[2], BladeSurfaceModel.Faces[3], Surface1, Surface2])
+            ListSurfaces.removeSplitter()
+            BladeShell = Part.makeShell(ListSurfaces.Faces)
+            BladeShell.removeSplitter()
+            BladeSolidInit = Part.makeSolid(BladeShell)
+
+        # Cut of the TE 
+
+        FaceShroudCut =Mer.Shape.Faces[0]
+
+        Shroudline = FaceShroudCut.Edges[2]
+        ShroudVertex1 = Shroudline.Vertexes[0]
+        ShroudVertex2 = Shroudline.Vertexes[1]
+
+        Spnt1 = ShroudVertex1.Point
+        Spnt2 = ShroudVertex2.Point
+        Spnt3 = FreeCAD.Vector(Spnt1[0],Spnt2[1],0)
+
+        LineShroudBlock = Part.LineSegment(FreeCAD.Vector(0, Spnt2[1],0), FreeCAD.Vector(2*Spnt2[0], Spnt2[1],0))
+        LineHubBlock = Part.LineSegment(FreeCAD.Vector(0, Spnt2[1]*1.5,0), FreeCAD.Vector(2*Spnt2[0], Spnt2[1]*1.5,0))
+        LineTopBlock = Part.LineSegment(FreeCAD.Vector(0, Spnt2[1],0), FreeCAD.Vector(0, Spnt2[1]*1.5,0))
+        LineDownBlock = Part.LineSegment(FreeCAD.Vector(2*Spnt2[0], Spnt2[1]*1.5,0), FreeCAD.Vector(2*Spnt2[0], Spnt2[1],0))
+
+        FaceShroudBlock = LineShroudBlock.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        FaceHubBlock = LineHubBlock.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        FaceTopBlock = LineTopBlock.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        FaceDownBlock = LineDownBlock.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+
+        BlockShell = Part.makeShell([FaceShroudBlock, FaceHubBlock, FaceTopBlock, FaceDownBlock])
+        BlockSolid = Part.makeSolid(BlockShell)
+
+        BladeSolidSecond = BladeSolidInit.cut(BlockSolid)
+
+
+        if obj.FullDomainCFD == False and obj.PeriodicDomainCFD == False:
+            #Cut of the Shroud Side of Blade 
+            R2 = Mer.D2/2.
+            rs = Mer.ds/2.
+            t = Mer.ThicknessHub
+
+            #Cut of the Shroud Side of Blade 
+            LineTopShroudCut = Part.LineSegment(Spnt2,Spnt3)
+            FaceTopShroudCut = LineTopShroudCut.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+            LineInletShroudCut = Part.LineSegment(Spnt3, Spnt1)
+            FaceInletShroudCut = LineInletShroudCut.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+
+            ShroudCutBLockShell = Part.makeShell([FaceShroudCut, FaceTopShroudCut, FaceInletShroudCut])
+            ShroudCutBLockSolid = Part.makeSolid(ShroudCutBLockShell)
+
+            BladeSolidThree = BladeSolidSecond.cut(ShroudCutBLockSolid)
+
+            # Cut of the Hub Side Of Blade
+
+            FaceHubCut = Mer.Shape.Faces[1]#Hub face
+
+            Hubline = FaceHubCut.Edges[2]
+            HubVertex2 = Hubline.Vertexes[0]
+            HubVertex3 = Hubline.Vertexes[1]
+
+            Hpnt22 = HubVertex2.Point
+            Hpnt3 = HubVertex3.Point
+
+            Hpnt1 = FreeCAD.Vector(Hpnt22[0],rs, 0)
+            Hpnt2 = FreeCAD.Vector(Hpnt22[0],(Hpnt22[1]+rs)/2., 0)
+            Hpnt4 = FreeCAD.Vector(Hpnt3[0]+t/2., Hpnt3[1], 0)
+            Hpnt5 = FreeCAD.Vector(Hpnt3[0]+t/2., (Hpnt22[1]+rs)/2., 0)
+            Hpnt6 = FreeCAD.Vector(Hpnt3[0]+R2, Hpnt3[1], 0)
+            Hpnt7 = FreeCAD.Vector(Hpnt3[0]+R2, rs, 0)
+
+            # Cut of the Hub Side Of Blade
+            Cut1 = Part.LineSegment(Hpnt1,Hpnt2)
+            Rot1 = Cut1.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+            Cut2 = Part.LineSegment(Hpnt2,Hpnt5)
+            Rot2 = Cut2.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+            Cut3 = Part.LineSegment(Hpnt5,Hpnt4)
+            Rot3 = Cut3.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+            Cut4 = Part.LineSegment(Hpnt4,Hpnt6)
+            Rot4 = Cut4.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+            Cut5 = Part.LineSegment(Hpnt6,Hpnt7)
+            Rot5 = Cut5.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+            Cut6 = Part.LineSegment(Hpnt7,Hpnt1)
+            Rot6 = Cut6.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+
+            HubCutBLockShell = Part.makeShell([Rot1, Rot2, Rot3, Rot4, Rot5,Rot6])
+            HubCutBLockSolid = Part.makeSolid(HubCutBLockShell)	
+
+            BladeSolid = BladeSolidThree.cut(HubCutBLockSolid)	
+
+            # Creation of a massive of blades
+            AngleRotateBlade = 360./float(obj.NumberOfBlades)
+           
+            BladesList = []
+            for i in range (0, obj.NumberOfBlades, 1):
+                BladeSolidi = BladeSolid.copy()
+                BladeSolidi.rotate(FreeCAD.Vector(0, 0, 0), FreeCAD.Vector(1, 0, 0), 0.5*AngleRotateBlade + AngleRotateBlade*(i))
+                BladesList.append(BladeSolidi)
+
+        elif obj.FullDomainCFD==True and obj.PeriodicDomainCFD == False:### Full Domain CFD 형상
+            print('a')
+        elif obj.FullDomainCFD==False and obj.PeriodicDomainCFD == True:###Periodic Domain CFD 형상
+            print('b')
+
+        obj.Shape = Part.Compound(BladesList)
 
 class Hub:
-	def __init__(self, obj):
-		obj.Proxy = self
+    def __init__(self, obj):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyFloat", "HubDiameter2", "Hub Profile", "2nd Diameter of Hub").HubDiameter2 = 100
+        obj.addProperty("App::PropertyFloat", "HubLength", "Hub profile", "Length of Hub").HubLength = 20.66
 
-	def execute (self, obj):
-		R2 = Mer.D2/2.
-		R0 = Mer.D0/2.
-		r0 = Mer.d0/2.
+    def execute (self, obj):
+        Mer = FreeCAD.ActiveDocument.getObject("Meridional")
 
-		### Creation of hub Solid
-		rs = Mer.ds/2.
-		FaceHubCut = Mer.Shape.Faces[1]
-		HubEdgeOutlet = Part.LineSegment(FreeCAD.Vector(Mer.L+Mer.b2,R2,0), FreeCAD.Vector(Mer.L+Mer.b2+Mer.ThicknessHub,R2,0))
-		FaceHubEdgeOutlet = HubEdgeOutlet.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-		HubEdgeBottom = Part.LineSegment(FreeCAD.Vector(Mer.L+Mer.b2+Mer.ThicknessHub,R2,0), FreeCAD.Vector(Mer.L+Mer.b2+Mer.ThicknessHub,rs,0))
-		FaceHubEdgeBottom = HubEdgeBottom.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-		HubEdgeShaft = Part.LineSegment(FreeCAD.Vector(Mer.L+Mer.b2+Mer.ThicknessHub,rs,0), FreeCAD.Vector(0,rs,0))
-		FaceHubEdgeShaft = HubEdgeShaft.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-		HubEdgeInlet = Part.LineSegment(FreeCAD.Vector(0,r0,0), FreeCAD.Vector(0,rs,0))
-		FaceHubEdgeInlet = HubEdgeInlet.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        rs = Mer.ds/2.
+        t = Mer.ThicknessHub
 
-		HubShell = Part.makeShell([FaceHubCut, FaceHubEdgeOutlet, FaceHubEdgeBottom, FaceHubEdgeShaft, FaceHubEdgeInlet])
-		HubSolid = Part.makeSolid(HubShell)
-		obj.Shape = HubSolid
+        FaceHubCut = Mer.Shape.Faces[1]
+        Hubline = FaceHubCut.Edges[2]
+
+        Vertex2 = Hubline.Vertexes[0]
+        Vertex3 = Hubline.Vertexes[1]
+
+        pnt2 = Vertex2.Point
+        pnt3 = Vertex3.Point
+
+        pnt1 = FreeCAD.Vector(0,rs,0)
+        pnt2 = Vertex2.Point
+        pnt3 = Vertex3.Point
+        pnt4 = FreeCAD.Vector(pnt3[0]+t,pnt3[1],0)
+        pnt5 = FreeCAD.Vector(pnt3[0]+t+obj.HubLength,obj.HubDiameter2/2.,0)
+        pnt6 = FreeCAD.Vector(pnt3[0]+t+obj.HubLength,rs,0)
+
+        inletEdge = Part.LineSegment(pnt1,pnt2)
+        FaceinletEdge = inletEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        thicknessEdge = Part.LineSegment(pnt3,pnt4)
+        FacethicknessEdge = thicknessEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        hubEdge = Part.LineSegment(pnt4,pnt5)
+        FacehubEdge = hubEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        hubEdge2 = Part.LineSegment(pnt5,pnt6)
+        FacehubEdge2 = hubEdge2.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+        shaftEdge = Part.LineSegment(pnt6,pnt1)
+        FaceshaftEdge = shaftEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+
+        HubShell = Part.makeShell([FaceHubCut, FaceinletEdge, FacethicknessEdge, FacehubEdge, FacehubEdge2, FaceshaftEdge])
+        HubSolid = Part.makeSolid(HubShell)
+
+        obj.Shape = HubSolid
+
+
 
 class DVGroup:
     def __init__(self, nameList, domainLB, domainUB, ptsNum, includeEdge):
@@ -1051,7 +911,7 @@ def printobjList():
 
 # Plots Kriging prediction in 3D surface plot. Select two design variables from DVGroupList with dvIndex1, dvIndex2
 # and then assign values for another design variables with anotherDVs
-def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValueVector, k):
+def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, funcName, div, sampleValueVector, k):
     if dvIndex1 > dvIndex2:
         dvIndex1, dvIndex2 = dvIndex2, dvIndex1
 
@@ -1074,20 +934,24 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
         
         dv1, dv2 = np.meshgrid(np.array(dv1), np.array(dv2))
         pred = np.reshape(pred, (div, div))
-        analytic = 1.2*np.power(10, 9)/np.power(dv2,2)/dv1
+        #analytic = 1.2*np.power(10, 9)/np.power(dv2,2)/dv1
 
-        fig = plt.figure(figsize = (14, 9))
-        ax = plt.axes(projection = '3d')
-        ax.set_xlabel('Design Variable 1')
-        ax.set_ylabel('Design Variable 2') 
+        fig = plt.figure(figsize=(14, 9))
+        ax = plt.axes(projection='3d')
         myCmap = plt.get_cmap('plasma')
 
         surf = ax.plot_surface(dv1, dv2, pred, cmap=myCmap, edgecolor='none')
-        surfAnalytic = ax.plot_wireframe(dv1, dv2, analytic, cmap='seismic')
+        #surfAnalytic = ax.plot_wireframe(dv1, dv2, analytic, cmap='seismic')
         scatter = ax.scatter(samplePts[0], samplePts[1], sampleValueVector, marker='x', s=100, c='black')
 
         fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-        ax.set_title('Kriging Prediction')
+
+        if not funcName[0].isupper():
+            charList = list(map(lambda c: c, funcName))
+            charList[0] = charList[0].upper()
+            funcName = ''.join(charList)
+
+        ax.set_title("Kriging Prediction of "+str(funcName))
 
         plt.show()
 
@@ -1096,7 +960,8 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, div, sampleValue
 
 
 if __name__ == "__main__":
-    FCPath = "C:\\Program Files\\FreeCAD 0.19"
+
+    FCPath = #@FCPath Placeholder
 
     try:
         FreeCADGui.showMainWindow()
@@ -1119,26 +984,32 @@ if __name__ == "__main__":
             myObj2.ViewObject.Proxy = 0 # this is mandatory unless we code the ViewProvider too
         Blade = FreeCAD.ActiveDocument.getObject("ModelOfBlade3D")
 
-
         myObj3 = FreeCAD.ActiveDocument.addObject('Part::FeaturePython', 'Blades')
         Blades(myObj3)
         if(bindProperties(myObj3, initialNameValueList[0], initialNameValueList)):
             myObj3.ViewObject.Proxy = 0 # this is mand atory unless we code the ViewProvider too
         Bla = FreeCAD.ActiveDocument.getObject("Blades")
+        
+        myObj4 = FreeCAD.ActiveDocument.addObject('Part::FeaturePython', 'Hub')
+        Hub(myObj4)
+        myObj4.ViewObject.Proxy = 0 # this is mandatory unless we code the ViewProvider too
+
         FreeCAD.ActiveDocument.recompute()
+
 
         path_os = os.getcwd()
         path_gui = re.sub(r'\\', '/',path_os)
 
 
         # Design Variable Grouping
-        m = 20
-        ndv = 2
+        m = 25
+        ndv = 3
         includeEdge = 0
-        thicknessGroup = DVGroup(["ThicknessLEShroud","ThicknessTEShroud","ThicknessPoint1Shroud","ThicknessPoint2Shroud","ThicknessLEHub","ThicknessTEHub","ThicknessPoint1Hub","ThicknessPoint2Hub","ThicknessLEAve","ThicknessTEAve","ThicknessPoint1Ave","ThicknessPoint2Ave"], 16.1, 20.3, m, includeEdge)
-        diameterGroup = DVGroup(["ds"], 70, 80, m, includeEdge)
+        dsGroup = DVGroup(["ds"], 20, 70, m, includeEdge)
+        hubDiameterGroup = DVGroup(["HubDiameter2"], 80, 190, m, includeEdge)
+        hubLengthGroup = DVGroup(["HubLength"], 10, 50, m, includeEdge)
 
-        DVGroupList = [thicknessGroup, diameterGroup]
+        DVGroupList = [dsGroup, hubDiameterGroup, hubLengthGroup]
         if len(DVGroupList) != ndv:
             print("DVGroupList length is not equal to given number of design variables")
             exit()
@@ -1183,12 +1054,11 @@ if __name__ == "__main__":
                 for obj in FreeCAD.ActiveDocument.Objects:
                     obj.touch()
                 FreeCAD.ActiveDocument.recompute()
-                print("Recompute ok")
+                print("Done recomputing")
 
                 if Bla.FullDomainCFD == False and Bla.PeriodicDomainCFD == False:
-                    myObj4 = FreeCAD.ActiveDocument.addObject('Part::FeaturePython', 'Hub')
-                    Hub(myObj4)
-                    myObj4.ViewObject.Proxy = 0 # this is mandatory unless we code the ViewProvider too
+                    if "Fusion" in list(map(lambda obj: obj.Name, FreeCAD.ActiveDocument.Objects)):
+                        FreeCAD.ActiveDocument.removeObject("Fusion")
 
                     Fusion = FreeCAD.ActiveDocument.addObject("Part::MultiFuse","Fusion")
                     FreeCAD.ActiveDocument.Fusion.Shapes = [FreeCAD.ActiveDocument.Blades,FreeCAD.ActiveDocument.Hub]
@@ -1203,25 +1073,28 @@ if __name__ == "__main__":
                     __objs__.append(FreeCAD.getDocument("Unnamed").getObject("Blades"))
                     Part.export(__objs__,path_gui+u"/impeller.step")
                     del __objs__ 
-                print("Step export ok")
+                print("Done exporting step file")
 
                 preprocExec = subprocess.Popen([sys.executable, os.getcwd()+u"\\preprocess.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)         
                 preprocSTDOUT, preprocSTDERR = preprocExec.communicate() 
                 #print("!"+preprocSTDOUT.decode('UTF-8')+"\n!!"+preprocSTDERR.decode('UTF-8'))
+                print("Done preprocessing")
 
                 ccxDir = os.getcwd()+u"\\ccx\\etc"
                 femExec = subprocess.Popen([ccxDir+u"\\runCCXnoCLS.bat", os.getcwd()+u"\\Static_analysis.inp"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 femSTDOUT, femSTDERR = femExec.communicate()
                 #print("!"+femSTDOUT.decode('UTF-8')+"\n!!"+femSTDERR.decode('UTF-8'))
+                print("Done running ccx")               
 
                 postprocExec = subprocess.Popen([sys.executable, os.getcwd()+u"\\postprocess.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 postprocSTDOUT, postprocSTDERR = postprocExec.communicate()
-                #os.system(u"powershell.exe "+os.getcwd()+u"\\scripts\\caseSaver.ps1 "+str(exp[0])+"_"+str(exp[1]))
-                #print("!"+postprocSTDOUT.decode('UTF-8')+"\n!!"+postprocSTDERR.decode('UTF-8'))
+                #os.system(u"powershell.exe "+os.getcwd()+u"\\scripts\\caseSaver.ps1 "+str(exp[0])+"_"+str(exp[1])+"_"+str(exp[2]))
+                #print("!"+postprocSTDOUT+"\n!!"+postprocSTDERR)
+                print("Done postprocessing") 
 
+                objectiveFuncValue.append(FreeCAD.ActiveDocument.Fusion.Shape.Volume)
                 constraintFuncValue.append(float(postprocSTDOUT.decode('UTF-8').strip('\r\n')))
-                objectiveFuncValue.append(exp[0]*exp[1])
-     
+
                 print(fg.green+"Objective function value: "+str(objectiveFuncValue[-1])+fg.rs)
                 print(fg.green+"Constraint function value: "+str(constraintFuncValue[-1])+"\n\n"+fg.rs)
 
@@ -1231,14 +1104,14 @@ if __name__ == "__main__":
 
 
         # Outlier Detection with MCD
-        def detectOutliersMCD(sampleList, constraintFuncValue, deleteOutlierPts=True, infill=False, samplePtsBeforeInfill=None):
-            yObserved = np.array(constraintFuncValue)
+        def detectOutliersMCD(sampleList, funcValue, infill=False, samplePtsBeforeInfill=None):
+            yObserved = np.array(funcValue)
             X = np.array(sampleList)
             
             augX = np.append(X, np.reshape(yObserved, (yObserved.shape[0],1)), axis=1)
             print("augX: ", augX)
 
-            outlierDetection = EllipticEnvelope(contamination=0.12)
+            outlierDetection = EllipticEnvelope(contamination=0.005)
             print("\nDetecting Outliers with Minimum Covariance Determinant (MCD): ")
             yHat = outlierDetection.fit_predict(augX)
             print("Outliers(-1): ", yHat)
@@ -1250,22 +1123,14 @@ if __name__ == "__main__":
             if infill or samplePtsBeforeInfill is not None:
                 for i in range(samplePtsBeforeInfill):
                     mask[i] = True
-            if deleteOutlierPts:
-                sampleListInlier, constraintFuncValueInlier = X[mask].tolist(), yObserved[mask].tolist()
-                print("Outlier removed dataset: \n\tsampleList: ", sampleList)
-                print("\tConstraint Func. Value: ", constraintFuncValue)
-
-                return sampleListInlier, constraintFuncValueInlier, mask
-
-            else:
-                return mask
-
+            
+            return mask
 
         # Simple median-absoulte-deviation(MAD) based 1D outlier detection for checkup
         # Returns whether an observation is an outlier or not: True if outlier
-        def detectOutliersMAD(constraintFuncValue, threshold=3.5):
-            median = np.median(constraintFuncValue, axis=0)
-            diff = np.abs(constraintFuncValue - median*np.ones(constraintFuncValue.shape[0]))
+        def detectOutliersMAD(funcValue, threshold=3.5):
+            median = np.median(funcValue, axis=0)
+            diff = np.abs(funcValue - median*np.ones(funcValue.shape[0]))
             mad = np.median(diff, axis=0)
 
             print("mad: ", mad)
@@ -1276,91 +1141,118 @@ if __name__ == "__main__":
                 return np.array(list(map(lambda Z: Z < threshold, modifiedZScore)))
             
 
-        # Redo experiments 5 times on outlier points
-        outlierMask = detectOutliersMCD(sampleList, constraintFuncValue, deleteOutlierPts=False)
-        for i in range(len(outlierMask)):
-            expRep = 7
+        # Redo experiments on detected outlier points
+        def verifyOutliers(DVGroupList, sampleList, funcIndex, funcValue, outlierMask, expRep):
             testObservations = []
-            if not outlierMask[i]:
-                print("Re-doing experiment for detected outlier point: ", sampleList[i])
+            outlierMask = outlierMask.tolist()
 
-                for j in range(expRep):
-                    testObservations.append(*experiment(DVGroupList, [sampleList[i]], j+1)[1])
-                testObservations = np.array(testObservations)
-                print("Initial checkup observations: ", testObservations)
-                
-                checkupMask = detectOutliersMAD(testObservations)
+            if len(sampleList) == len(funcValue) == len(outlierMask):
+                for i in range(len(outlierMask)):
+                    if not outlierMask[i]:
+                        print("Re-doing experiment for detected outlier point: ", sampleList[i])
 
-                # MAD is zero
-                if len(checkupMask.shape) == 0:
-                    if np.abs(1-checkupMask/constraintFuncValue[i]) < 0.01:
-                        outlierMask[i] = True
-                
-                # MAD is nonzero
-                else: 
-                    testObservations = testObservations[checkupMask]
+                        for j in range(expRep):
+                            testObservations.append(*experiment(DVGroupList, [sampleList[i]], j+1)[funcIndex])
+                        testObservations = np.array(testObservations)
+                        print("Initial checkup observations: ", testObservations)
+                        
+                        checkupMask = detectOutliersMAD(testObservations)
 
-                    print("Outlier removed checkup observations: ", testObservations)
-                    testObservations = np.append(testObservations, [constraintFuncValue[i]], axis=0)
-                    checkupMask = detectOutliersMAD(testObservations)
+                        # MAD is zero: checkupMask is median of testObservations
+                        if len(checkupMask.shape) == 0:
+                            if np.abs(1-checkupMask/funcValue[i]) < 0.01:
+                                outlierMask[i] = True
+                        
+                        # MAD is nonzero: checkUpMask is verified with MAD
+                        else: 
+                            testObservations = testObservations[checkupMask]
 
-                    if checkupMask[-1]:
-                        print("Prior experiment result seems ok\n")
-                        outlierMask[i] = True
+                            print("Outlier removed checkup observations: ", testObservations)
+                            testObservations = np.append(testObservations, [funcValue[i]], axis=0)
+                            checkupMask = detectOutliersMAD(testObservations)
 
-        print("rearranged outlier mask: ", outlierMask)
-        sampleList, constraintFuncValue = np.array(sampleList)[np.array(outlierMask)].tolist(), np.array(constraintFuncValue)[np.array(outlierMask)].tolist()
+                            if checkupMask[-1]:
+                                print("Prior experiment result seems ok\n")
+                                outlierMask[i] = True
+
+            return outlierMask
+        
+        outlierMaskObj = detectOutliersMCD(sampleList, objectiveFuncValue)
+        outlierMaskObj = verifyOutliers(DVGroupList, sampleList, 0, objectiveFuncValue, outlierMaskObj, 3)
+
+        outlierMaskConstr = detectOutliersMCD(sampleList, constraintFuncValue)
+        outlierMaskConstr = verifyOutliers(DVGroupList, sampleList, 1, constraintFuncValue, outlierMaskConstr, 3)
+        
+        print("Rearranged outlier mask of objective func.: ", outlierMaskObj)
+        print("Rearranged outlier mask of constraint func.: ", outlierMaskConstr)
+
+        sampleListObj, objectiveFuncValue = np.array(sampleList)[np.array(outlierMaskObj)].tolist(), np.array(objectiveFuncValue)[np.array(outlierMaskObj)].tolist()
+        sampleListConstr, constraintFuncValue = np.array(sampleList)[np.array(outlierMaskConstr)].tolist(), np.array(constraintFuncValue)[np.array(outlierMaskConstr)].tolist()
                 
                     
         # Kriging the result
-        krig = kriging(np.array(sampleList), np.array(constraintFuncValue))
-        krig.train()
+        print("Training for objective function Kriging prediction\n")
+        krigObj = kriging(np.array(sampleListObj), np.array(objectiveFuncValue))
+        krigObj.train()
+
+        print("Training for constraint function Kriging prediction\n")
+        krigConstr = kriging(np.array(sampleListConstr), np.array(constraintFuncValue))
+        krigConstr.train()
 
 
         # Infill points for Kriging + outlier detection with MCD
-        infillRep = 10
-        infillNum = 1
-        outilerMask = []
-        print("\nExperiments for Infill Points: ")
-        for i in range(infillRep):
-            # infill criteria are either 'ei' (expected improvement) or 'error' (point of biggest MSE)
-            # and also, remember to set addPoint=False so we can decide whether a infill point and its observation is outlier.
-            newPts = krig.infill(infillNum, method='ei', addPoint=False).tolist()
+        
+        def doInfill(DVGroupList, sampleList, funcValue, funcIndex, krig, infillRep, infillNum):
+            print("\nExperiments for Infill Points: ")
+            for i in range(infillRep):
+                # infill criteria are either 'ei' (expected improvement) or 'error' (point of biggest error)
+                # and also, remember to set addPoint=False so we can decide whether a infill point and its observation is outlier.
+                newPts = krig.infill(infillNum, method='ei', addPoint=False).tolist()
 
-            sampleNumBeforehand = len(sampleList)
-            sampleList += newPts
-            for j in range(len(newPts)):
-                constraintFuncValue.append(*experiment(DVGroupList, [newPts[j]], infillNum*i+j+1)[1])
+                sampleNumBeforehand = len(sampleList)
+                sampleList += newPts
+                for j in range(len(newPts)):
+                    funcValue.append(*experiment(DVGroupList, [newPts[j]], infillNum*i+j+1)[funcIndex])
 
-            sampleList, constraintFuncValue, outlierMask = detectOutliersMCD(sampleList, constraintFuncValue, deleteOutlierPts=True, infill=True, samplePtsBeforeInfill=sampleNumBeforehand) 
-            print("outlier removed: ", sampleList, constraintFuncValue) 
-            for j in range(sampleNumBeforehand, len(sampleList), 1):
-                krig.addPoint(np.array(sampleList[j]), np.array(constraintFuncValue[j]))
-                krig.train()
-                        
-            print("sampleList: ", sampleList, "\n")
-            print("constFuncValue: ", constraintFuncValue, "\n")
-            print("outlierMask: ", outlierMask, "\n")
-            print("k.X length: ", krig.X.shape[0], "\n")
-            print("k.y length: ", krig.y.shape[0], "\n")
+                outlierMask = detectOutliersMCD(sampleList, funcValue, infill=True, samplePtsBeforeInfill=sampleNumBeforehand) 
+                print("outlier removed: ", sampleList, funcValue) 
+                for j in range(sampleNumBeforehand, len(sampleList), 1):
+                    krig.addPoint(np.array(sampleList[j]), np.array(funcValue[j]))
+                    krig.train()
+                            
+                print("sampleList: ", sampleList, "\n")
+                print("constFuncValue["+str(funcIndex)+"]: ", funcValue, "\n")
+                print("outlierMask: ", outlierMask, "\n")
+                print("k.X length: ", krig.X.shape[0], "\n")
+                print("k.y length: ", krig.y.shape[0], "\n")
 
-
-        # Cross Validation of the model
-
-
+            return sampleList, funcValue, krig
+       
+        print("\nObjective function infill: \n")
+        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVGroupList, sampleListObj, objectiveFuncValue, 0, krigObj, 5, 1)
+        print("\nConstraint function infill: \n")
+        sampleListConstr, ConstraintFuncValue, krigConstr = doInfill(DVGroupList, sampleListConstr, constraintFuncValue, 1, krigConstr, 5, 1)
+    
 
         # Print the result and result assessment
-        predictedResult = translatePrediction(np.array(sampleList), np.array(constraintFuncValue), krig)
+        predictedObjectiveResult = translatePrediction(np.array(sampleListObj), np.array(objectiveFuncValue), krigObj)
+        predictedConstraintResult = translatePrediction(np.array(sampleListConstr), np.array(constraintFuncValue), krigConstr)
 
-        print("\nKriging result of constraint function - Max. von Mises Stress: \n"+str(translatePredictionToMatlab(["x", "y"], np.array(constraintFuncValue), krig)))
+        print("\n\nKriging result of objective function - Volume of impeller: \n"+str(translatePredictionToMatlab(["x", "y", "z"], np.array(objectiveFuncValue), krigObj)))
+        print("\n\nObjective function values acquired with FreeCAD: \n"+str(objectiveFuncValue))
+        print("\n\nObjective function values acquired with Kriging: \n"+str(predictedObjectiveResult))
+        print("\n\nObject. func. R^2 = "+str(krigObj.rsquared(np.array(objectiveFuncValue), np.array(predictedObjectiveResult))))
+ 
+        print("\n\nKriging result of constraint function - Max. von Mises Stress: \n"+str(translatePredictionToMatlab(["x", "y", "z"], np.array(constraintFuncValue), krigConstr)))
         print("\n\nConstraint function values acquired with FEA: \n"+str(constraintFuncValue))
-        print("\n\nConstraint function values estimated with Kriging: \n"+str(predictedResult))
-        print("\n\nR^2 = "+str(krig.rsquared(np.array(constraintFuncValue), np.array(predictedResult))))
+        print("\n\nConstraint function values estimated with Kriging: \n"+str(predictedConstraintResult))
+        print("\n\nConstr. func. R^2 = "+str(krigConstr.rsquared(np.array(constraintFuncValue), np.array(predictedConstraintResult))))
 
         #matlabPlot()
         #printsampleList()
         #printobjList()
-        plotPrediction(DVGroupList, 0, 1, [], 100, np.array(constraintFuncValue), krig)
+        plotPrediction(DVGroupList, 1, 2, [70], "Volume", 100, np.array(constraintFuncValue), krigObj)
+        plotPrediction(DVGroupList, 1, 2, [70], "maxVonMises", 100, np.array(objectiveFuncValue), krigConstr)
 
     except Exception as e:
         logging.info(e)

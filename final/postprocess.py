@@ -20,7 +20,7 @@ def silenceStdout(newStream=None):
 
 
 def frdManipulation():
-    with open('Static_analysis.frd', 'r',encoding = 'UTF-8') as f:
+    with open('Static_analysis.frd', 'r') as f:
         list_file = []
         for line in f:
             list_file.append(line)
@@ -48,24 +48,20 @@ def frdManipulation():
     stress = list_file[found2:]
 
 
-    with open('disp.frd','w',encoding='UTF-8') as f:
+    with open('disp.frd','w') as f:
         for sline in disp:
             f.write(sline)
         f.close()
 
-    with open('stress.frd','w',encoding='UTF-8') as f:
+    with open('stress.frd','w') as f:
         for sline in stress:
             f.write(sline)
         f.close()
 
 
-
-
-# Approximate Maximum von Mises Stress with p-Norm: Considering Computational Instability
-# p = 10
 def maxVonMises():
     stress_list = []
-    with open(os.getcwd()+u"\\stress.frd", mode='r', encoding='UTF-8') as f:
+    with open(os.getcwd()+u"\\stress.frd", mode='r') as f:
         lines = f.readlines()
         for line in lines:
             if(re.search(r'^\s{1}-1[\s0-9]{10}',line)):
@@ -102,7 +98,7 @@ def maxVonMises():
     #     f.writelines("hj, jh: "+str(hjMaxVM*math.pow(sum(hjVonMisesList), 1/p))+"   "+str(jhMaxVM*math.pow(sum(jhVonMisesList), 1/p))+"\n")
     #     f.close
 
-    return float(hjMaxVM)
+    return float(jhMaxVM)
 
 
 

@@ -1,4 +1,4 @@
-param([String]$RmUn="12")
+param([String]$RmUn="123")
 
 $RmVimSwapsList = (".*.swp", "*~*")
 $RmFEAList = ("*.FCStd*", "*.inp", "*.nam", "*.frd", "*.dat", "*.cvg", "*.sta", "*.out")

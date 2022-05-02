@@ -146,7 +146,7 @@ class ModelOfBlade3D:
 
 		chartShroud = chartBetaTheta(betaiShroud, dThetaShroudSum, obj.AnglesChartShroud)
 		chartHub = chartBetaTheta(betaiHub, dThetaHubSum, obj.AnglesChartHub)
-
+        
         aveCurveEdge = Mer.Shape.Edges[4]
         aveCurveEdgeDiscret = aveCurveEdge.discretize(Number = obj.N)
         aveCurveEdgeDiscret.append(aveCurveEdge.lastVertex().Point)

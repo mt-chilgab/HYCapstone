@@ -1,12 +1,3 @@
-# Script creates a meridional plane of a radial impeller
-import FreeCAD, FreeCADGui, Part
-
-FreeCADGui.showMainWindow()
-FreeCADGui.updateGui()
-
-with open('C:\\Users\Grant\\AppData\\Local\\Programs\\FreeCAD 0.19\\data\\Mod\\Start\\StartPage\\LoadNew.py') as file:
-	exec(file.read())
-
 class Meridional:
     def __init__(self, obj):
         obj.Proxy = self
@@ -139,4 +130,4 @@ myObj.ViewObject.Proxy = 0 # this is mandatory unless we code the ViewProvider t
 print("!!"+str(getattr(myObj, "L")))
 FreeCAD.ActiveDocument.recompute()
 FreeCADGui.ActiveDocument.getObject("Meridional").Transparency = 50
-FreeCADGui.exec_loop()
+
