@@ -824,7 +824,7 @@ def translatePredictionToMatlab(dvNameList, sampleValueVector, k):
     for i in range(len(basisList)):
         basisList[i] = "("+str(weightList[i])+")"+"*"+basisList[i]
 
-    return str(k.inversenormy(k.mu))+"+"+"+".join(basisList)
+    return str(k.mu)+"+"+"+".join(basisList)
 
 def translatePrediction(pointsList, sampleValueVector, k):
     k.updateData() 
@@ -852,33 +852,9 @@ def translatePrediction(pointsList, sampleValueVector, k):
             for (j, theta, p) in zip(range(samplePoints.shape[1]), thetaList, pList):
                 basisExponentValue += -1*theta*np.power(abs((samplePoints[i][j]-point[j])/scalingFactorList[j]), p)
             resultValue += weightList[i]*np.exp(basisExponentValue)
-        resultValueList.append(resultValue+k.inversenormy(k.mu))
+        resultValueList.append(resultValue+k.mu)
 
     return resultValueList
-
-def matlabPlot():
-    string = []
-    string.append('x1=100:1:200;\n')
-    string.append('x2=100:1:200;\n\n')
-    string.append('s = 101;\n')
-    string.append('for i = 1:s\n')
-    string.append('\tfor j = 1:s\n')
-    string.append('\t\tx = x1(1,i);\n')
-    string.append('\t\ty = x2(1,j);\n')
-    string.append('\t\tf(j,i) = ')
-    string.append(str(translatePredictionToMatlab(["x", "y"], np.array(constraintFuncValue), krig)))
-    string.append(';\n')
-    string.append('\tend\n')
-    string.append('end\n\n')
-    string.append('surf(x1,x2,f)\n\n')
-    string.append('hold on\n\n')
-    string.append(r'[X,Y] = readvars("valueset.txt");'+'\n')
-    string.append(r'[a,b,c,Z] = readvars("objlist.txt");'+'\n\n')
-    string.append(r'scatter3(X,Y,Z,"filled","MarkerFaceColor","r");')
-
-    with open('testplot.m','w',encoding='UTF-8') as f:
-        for line in string:
-            f.write(line)
 
 def printsampleList():
     str_list = []
@@ -1002,7 +978,7 @@ if __name__ == "__main__":
 
 
         # Design Variable Grouping
-        m = 25
+        m = 10
         ndv = 3
         includeEdge = 0
         dsGroup = DVGroup(["ds"], 20, 70, m, includeEdge)
@@ -1092,11 +1068,11 @@ if __name__ == "__main__":
                 #print("!"+postprocSTDOUT+"\n!!"+postprocSTDERR)
                 print("Done postprocessing") 
 
-                objectiveFuncValue.append(FreeCAD.ActiveDocument.Fusion.Shape.Volume)
-                constraintFuncValue.append(float(postprocSTDOUT.decode('UTF-8').strip('\r\n')))
-
-                print(fg.green+"Objective function value: "+str(objectiveFuncValue[-1])+fg.rs)
-                print(fg.green+"Constraint function value: "+str(constraintFuncValue[-1])+"\n\n"+fg.rs)
+                objectiveFuncValue.append(FreeCAD.ActiveDocument.Fusion.Shape.Volume/np.power(10, 6))
+                constraintFuncValue.append(float(postprocSTDOUT.decode('UTF-8').strip('\r\n'))/100)
+               
+                print(fg.green+"Objective function value (dm^3): "+str(objectiveFuncValue[-1])+fg.rs)
+                print(fg.green+"Constraint function value : "+str(constraintFuncValue[-1])+"x 100MPa"+"\n\n"+fg.rs)
 
             return objectiveFuncValue, constraintFuncValue
 
@@ -1109,7 +1085,7 @@ if __name__ == "__main__":
             X = np.array(sampleList)
             
             augX = np.append(X, np.reshape(yObserved, (yObserved.shape[0],1)), axis=1)
-            print("augX: ", augX)
+            #print("augX: ", augX)
 
             outlierDetection = EllipticEnvelope(contamination=0.005)
             print("\nDetecting Outliers with Minimum Covariance Determinant (MCD): ")
@@ -1231,9 +1207,9 @@ if __name__ == "__main__":
             return sampleList, funcValue, krig
        
         print("\nObjective function infill: \n")
-        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVGroupList, sampleListObjBeforeInfill, objectiveFuncValueBeforeInfill, 0, krigObj, 5, 1)
+        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVGroupList, sampleListObjBeforeInfill, objectiveFuncValueBeforeInfill, 0, krigObj, 3, 1)
         print("\nConstraint function infill: \n")
-        sampleListConstr, constraintFuncValue, krigConstr = doInfill(DVGroupList, sampleListConstrBeforeInfill, constraintFuncValueBeforeInfill, 1, krigConstr, 5, 1)
+        sampleListConstr, constraintFuncValue, krigConstr = doInfill(DVGroupList, sampleListConstrBeforeInfill, constraintFuncValueBeforeInfill, 1, krigConstr, 3, 1)
     
 
         # Print the result and result assessment
@@ -1253,8 +1229,8 @@ if __name__ == "__main__":
         #matlabPlot()
         #printsampleList()
         #printobjList()
-        plotPrediction(DVGroupList, 1, 2, [70], "Volume", 100, np.array(constraintFuncValue), krigObj)
-        plotPrediction(DVGroupList, 1, 2, [70], "maxVonMises", 100, np.array(objectiveFuncValue), krigConstr)
+        plotPrediction(DVGroupList, 1, 2, [70], "Volume", 100, np.array(objectiveFuncValue), krigObj)
+        plotPrediction(DVGroupList, 1, 2, [70], "maxVonMises", 100, np.array(constraintFuncValue), krigConstr)
 
     except Exception as e:
         logging.info(e)
