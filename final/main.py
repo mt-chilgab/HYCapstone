@@ -824,7 +824,7 @@ def translatePredictionToMatlab(dvNameList, sampleValueVector, k):
     for i in range(len(basisList)):
         basisList[i] = "("+str(weightList[i])+")"+"*"+basisList[i]
 
-    return str(k.mu)+"+"+"+".join(basisList)
+    return str(k.inversenormy(k.mu))+"+"+"+".join(basisList)
 
 def translatePrediction(pointsList, sampleValueVector, k):
     k.updateData() 
@@ -852,7 +852,7 @@ def translatePrediction(pointsList, sampleValueVector, k):
             for (j, theta, p) in zip(range(samplePoints.shape[1]), thetaList, pList):
                 basisExponentValue += -1*theta*np.power(abs((samplePoints[i][j]-point[j])/scalingFactorList[j]), p)
             resultValue += weightList[i]*np.exp(basisExponentValue)
-        resultValueList.append(resultValue+k.mu)
+        resultValueList.append(resultValue+k.inversenormy(k.mu))
 
     return resultValueList
 
@@ -1186,17 +1186,17 @@ if __name__ == "__main__":
         print("Rearranged outlier mask of objective func.: ", outlierMaskObj)
         print("Rearranged outlier mask of constraint func.: ", outlierMaskConstr)
 
-        sampleListObj, objectiveFuncValue = np.array(sampleList)[np.array(outlierMaskObj)].tolist(), np.array(objectiveFuncValue)[np.array(outlierMaskObj)].tolist()
-        sampleListConstr, constraintFuncValue = np.array(sampleList)[np.array(outlierMaskConstr)].tolist(), np.array(constraintFuncValue)[np.array(outlierMaskConstr)].tolist()
+        sampleListObjBeforeInfill, objectiveFuncValueBeforeInfill = np.array(sampleList)[np.array(outlierMaskObj)].tolist(), np.array(objectiveFuncValue)[np.array(outlierMaskObj)].tolist()
+        sampleListConstrBeforeInfill, constraintFuncValueBeforeInfill = np.array(sampleList)[np.array(outlierMaskConstr)].tolist(), np.array(constraintFuncValue)[np.array(outlierMaskConstr)].tolist()
                 
                     
         # Kriging the result
         print("Training for objective function Kriging prediction\n")
-        krigObj = kriging(np.array(sampleListObj), np.array(objectiveFuncValue))
+        krigObj = kriging(np.array(sampleListObjBeforeInfill), np.array(objectiveFuncValueBeforeInfill))
         krigObj.train()
 
         print("Training for constraint function Kriging prediction\n")
-        krigConstr = kriging(np.array(sampleListConstr), np.array(constraintFuncValue))
+        krigConstr = kriging(np.array(sampleListConstrBeforeInfill), np.array(constraintFuncValueBeforeInfill))
         krigConstr.train()
 
 
@@ -1231,9 +1231,9 @@ if __name__ == "__main__":
             return sampleList, funcValue, krig
        
         print("\nObjective function infill: \n")
-        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVGroupList, sampleListObj, objectiveFuncValue, 0, krigObj, 5, 1)
+        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVGroupList, sampleListObjBeforeInfill, objectiveFuncValueBeforeInfill, 0, krigObj, 5, 1)
         print("\nConstraint function infill: \n")
-        sampleListConstr, constraintFuncValue, krigConstr = doInfill(DVGroupList, sampleListConstr, constraintFuncValue, 1, krigConstr, 5, 1)
+        sampleListConstr, constraintFuncValue, krigConstr = doInfill(DVGroupList, sampleListConstrBeforeInfill, constraintFuncValueBeforeInfill, 1, krigConstr, 5, 1)
     
 
         # Print the result and result assessment
