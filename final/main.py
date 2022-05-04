@@ -616,8 +616,10 @@ class Blades:
 class Hub:
     def __init__(self, obj):
         obj.Proxy = self
-        obj.addProperty("App::PropertyFloat", "HubDiameter2", "Hub Profile", "2nd Diameter of Hub").HubDiameter2 = 100
-        obj.addProperty("App::PropertyFloat", "HubLength", "Hub profile", "Length of Hub").HubLength = 20.66
+        obj.addProperty("App::PropertyFloat", "BezierPoint1", "Hub profile", "Length of Hub").BezierPoint1 = 35
+        obj.addProperty("App::PropertyFloat", "BezierPoint2", "Hub profile", "Length of Hub").BezierPoint2 = -5
+        obj.addProperty("App::PropertyFloat", "BezierPoint3", "Hub profile", "Length of Hub").BezierPoint3 = 0
+        obj.addProperty("App::PropertyFloat", "BezierPoint4", "Hub profile", "Length of Hub").BezierPoint4 = 10
 
     def execute (self, obj):
         Mer = FreeCAD.ActiveDocument.getObject("Meridional")
@@ -638,21 +640,31 @@ class Hub:
         pnt2 = Vertex2.Point
         pnt3 = Vertex3.Point
         pnt4 = FreeCAD.Vector(pnt3[0]+t,pnt3[1],0)
-        pnt5 = FreeCAD.Vector(pnt3[0]+t+obj.HubLength,obj.HubDiameter2/2.,0)
-        pnt6 = FreeCAD.Vector(pnt3[0]+t+obj.HubLength,rs,0)
+        pnt5 = FreeCAD.Vector(pnt4[0]+obj.BezierPoint4,pnt4[1]-55,0)
+        pnt6 = FreeCAD.Vector(pnt4[0]+obj.BezierPoint3,pnt4[1]-95,0)
+        pnt7 = FreeCAD.Vector(pnt4[0]+obj.BezierPoint2,pnt4[1]-135,0)
+        pnt8 = FreeCAD.Vector(pnt4[0]+obj.BezierPoint1,pnt4[1]-175,0)
+        pnt9 = FreeCAD.Vector(pnt4[0]+obj.BezierPoint1,rs,0)
+
+        BezierP = [pnt4, pnt5, pnt6, pnt7,pnt8]
+
 
         inletEdge = Part.LineSegment(pnt1,pnt2)
         FaceinletEdge = inletEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
         thicknessEdge = Part.LineSegment(pnt3,pnt4)
-        FacethicknessEdge = thicknessEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-        hubEdge = Part.LineSegment(pnt4,pnt5)
-        FacehubEdge = hubEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-        hubEdge2 = Part.LineSegment(pnt5,pnt6)
-        FacehubEdge2 = hubEdge2.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
-        shaftEdge = Part.LineSegment(pnt6,pnt1)
+        FacethicknessEdge = thicknessEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360) 
+		
+        Bezierline = Part.BezierCurve()
+        Bezierline.setPoles(BezierP)
+        FaceBezierline = Bezierline.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0),360)
+
+        finalEdge = Part.LineSegment(pnt8,pnt9)
+        FacefinalEdge = finalEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
+
+        shaftEdge = Part.LineSegment(pnt9,pnt1)
         FaceshaftEdge = shaftEdge.toShape().revolve(FreeCAD.Vector(0,0,0), FreeCAD.Vector(1,0,0), 360)
 
-        HubShell = Part.makeShell([FaceHubCut, FaceinletEdge, FacethicknessEdge, FacehubEdge, FacehubEdge2, FaceshaftEdge])
+        HubShell = Part.makeShell([FaceHubCut, FaceinletEdge, FacethicknessEdge, FaceBezierline, FacefinalEdge, FaceshaftEdge])
         HubSolid = Part.makeSolid(HubShell)
 
         obj.Shape = HubSolid
@@ -856,34 +868,82 @@ def translatePrediction(pointsList, sampleValueVector, k):
 
     return resultValueList
 
-def printsampleList():
+def printDVList():
     str_list = []
     for i in range(math.floor(m)):
         mapped_line = sampleList[i]
         str_line = []
         for j in range(ndv):
-            str_line.append(format(mapped_line[j],'>15,.6E'))
+            str_line.append(format(mapped_line[j],'>15,.8E'))
         str_line2 = ''.join(str_line)+'\n'
         str_list.append(str_line2)
     str_list[-1]=str_list[-1][:-1]
 
-    with open('valueset.txt','w',encoding='UTF-8') as f:
+    with open('dvList.txt','w',encoding='UTF-8') as f:
         for value in str_list:
             f.write(value)
 
-def printobjList():
+def printConstrList():
     str_list = []
     for i in range(math.floor(m)):
-        obj_line = constraintFuncValue[i]
+        constr_line = constraintFuncValue[i]
         str_line = []
-        str_line.append(format(obj_line,'>15,.6E'))
+        str_line.append(format(constr_line,'>15,.8E'))
         str_line2 = ''.join(str_line)+'\n'
         str_list.append(str_line2)
     str_list[-1]=str_list[-1][:-1]
 
-    with open('objlist.txt','w',encoding='UTF-8') as f:
+    with open('constrList.txt','w',encoding='UTF-8') as f:
         for value in str_list:
             f.write(value)
+
+def printObjList():
+    str_list = []
+    for i in range(math.floor(m)):
+        obj_line = objectiveFuncValue[i]
+        str_line = []
+        str_line.append(format(obj_line,'>15,.8E'))
+        str_line2 = ''.join(str_line)+'\n'
+        str_list.append(str_line2)
+    str_list[-1]=str_list[-1][:-1]
+
+    with open('objList.txt','w',encoding='UTF-8') as f:
+        for value in str_list:
+            f.write(value)
+
+def matlabObjective():
+    string = []
+    string.append('function [obj] = objective(value)\n\n')
+    string.append('global value_his;\n')
+    string.append('global obj_his;\n')
+    string.append('obj = ')
+    string.append(str(translatePredictionToMatlab(["value(1)", "value(2)", "value(3)", "value(4)"], np.array(objectiveFuncValue), krigObj)))
+    string.append(';\n\n')
+    string.append('value_his = [value_his; value];\n')
+    string.append('obj_his=[obj_his;obj];\n')
+    string.append('end')
+
+    with open('objective.m','w',encoding='UTF-8') as f:
+        for line in string:
+            f.write(line)
+
+
+def matlabConstraint():
+    string = []
+    string.append('function [c,ceq]=nonlcon(value)\n\n')
+    string.append('global von_his;\n')
+    string.append('von = ')
+    string.append(str(translatePredictionToMatlab(["value(1)", "value(2)", "value(3)", "value(4)"], np.array(constraintFuncValue), krigConstr)))
+    string.append(';\n\n')
+    string.append('c= von-503;\n')
+    string.append('ceq=[];\n\n')
+    string.append('von_his = [von_his;von];\n\n')
+    string.append('end')
+
+    with open('nonlcon.m','w',encoding='UTF-8') as f:
+        for line in string:
+            f.write(line)
+        f.close
 
 # Plots Kriging prediction in 3D surface plot. Select two design variables from DVGroupList with dvIndex1, dvIndex2
 # and then assign values for another design variables with anotherDVs
@@ -979,13 +1039,14 @@ if __name__ == "__main__":
 
         # Design Variable Grouping
         m = 10
-        ndv = 3
+        ndv = 4
         includeEdge = 0
-        dsGroup = DVGroup(["ds"], 20, 70, m, includeEdge)
-        hubDiameterGroup = DVGroup(["HubDiameter2"], 80, 190, m, includeEdge)
-        hubLengthGroup = DVGroup(["HubLength"], 10, 50, m, includeEdge)
+        bPoint1 = DVGroup(["BezierPoint1"],0,70,m,includeEdge)
+        bPoint2 = DVGroup(["BezierPoint2"],-70,60,m,includeEdge)
+        bPoint3 = DVGroup(["BezierPoint3"],-40,40,m,includeEdge)
+        bPoint4 = DVGroup(["BezierPoint4"],-10,30,m,includeEdge)
 
-        DVGroupList = [dsGroup, hubDiameterGroup, hubLengthGroup]
+        DVGroupList = [bPoint1,bPoint2,bPoint3,bPoint4]
         if len(DVGroupList) != ndv:
             print("DVGroupList length is not equal to given number of design variables")
             exit()
@@ -1064,7 +1125,7 @@ if __name__ == "__main__":
 
                 postprocExec = subprocess.Popen([sys.executable, os.getcwd()+u"\\postprocess.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 postprocSTDOUT, postprocSTDERR = postprocExec.communicate()
-                #os.system(u"powershell.exe "+os.getcwd()+u"\\scripts\\caseSaver.ps1 "+str(exp[0])+"_"+str(exp[1])+"_"+str(exp[2]))
+                os.system(u"powershell.exe "+os.getcwd()+u"\\scripts\\caseSaver.ps1 "+str(exp[0])+"_"+str(exp[1])+"_"+str(exp[2])+"_"+str(exp[3]))
                 #print("!"+postprocSTDOUT+"\n!!"+postprocSTDERR)
                 print("Done postprocessing") 
 
@@ -1216,19 +1277,21 @@ if __name__ == "__main__":
         predictedObjectiveResult = translatePrediction(np.array(sampleListObj), np.array(objectiveFuncValue), krigObj)
         predictedConstraintResult = translatePrediction(np.array(sampleListConstr), np.array(constraintFuncValue), krigConstr)
 
-        print("\n\nKriging result of objective function - Volume of impeller: \n"+str(translatePredictionToMatlab(["x", "y", "z"], np.array(objectiveFuncValue), krigObj)))
+        print("\n\nKriging result of objective function - Volume of impeller: \n"+str(translatePredictionToMatlab(["z1", "z2", "z3", "z4"], np.array(objectiveFuncValue), krigObj)))
         print("\n\nObjective function values acquired with FreeCAD: \n"+str(objectiveFuncValue))
         print("\n\nObjective function values acquired with Kriging: \n"+str(predictedObjectiveResult))
         print("\n\nObject. func. R^2 = "+str(krigObj.rsquared(np.array(objectiveFuncValue), np.array(predictedObjectiveResult))))
  
-        print("\n\nKriging result of constraint function - Max. von Mises Stress: \n"+str(translatePredictionToMatlab(["x", "y", "z"], np.array(constraintFuncValue), krigConstr)))
+        print("\n\nKriging result of constraint function - Max. von Mises Stress: \n"+str(translatePredictionToMatlab(["z1", "z2", "z3", "z4"], np.array(constraintFuncValue), krigConstr)))
         print("\n\nConstraint function values acquired with FEA: \n"+str(constraintFuncValue))
         print("\n\nConstraint function values estimated with Kriging: \n"+str(predictedConstraintResult))
         print("\n\nConstr. func. R^2 = "+str(krigConstr.rsquared(np.array(constraintFuncValue), np.array(predictedConstraintResult))))
 
-        #matlabPlot()
-        #printsampleList()
-        #printobjList()
+        printDVList()
+        printObjList()
+        printConstrList()
+        matlabObjective()
+        matlabConstraint()
         plotPrediction(DVGroupList, 1, 2, [70], "Volume", 100, np.array(objectiveFuncValue), krigObj)
         plotPrediction(DVGroupList, 1, 2, [70], "maxVonMises", 100, np.array(constraintFuncValue), krigConstr)
 

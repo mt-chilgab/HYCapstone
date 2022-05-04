@@ -95,8 +95,18 @@ float HalfD3toD2 = 1.2
 
 
 ### Variables from Script #4
-float HubDiameter2 = 100
-float HubLength = 20.66
+
+### 0 ~ 70
+float BezierPoint1 = 35
+
+### -70 ~ 60
+float BezierPoint2 = -5
+
+### -40 ~ 40
+float BezierPoint3 = 0
+
+### -10 ~ 30
+float BezierPoint4 = 10
 
 # Material Properties for FEA (Aluminium)
 matprop float E = 71.7e3,.33
