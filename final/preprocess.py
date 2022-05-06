@@ -40,12 +40,12 @@ def inpManipulation():
                 NumberSurface += 1
     f.close()
 
-    found1 = list_file.index('*ELEMENT, type=CPS3, ELSET=Surface'+str(NumberSurface)+'\n')
-    # found2 = list_file.index('*ELEMENT, type=CPS6, ELSET=Surface6\n')
+    found1 = list_file.index('*ELEMENT, type=CPS3, ELSET=Surface'+str(NumberSurface-1)+'\n')
+    found2 = list_file.index('*ELEMENT, type=CPS3, ELSET=Surface'+str(NumberSurface)+'\n')
     found3 = list_file.index('*ELEMENT, type=T3D2, ELSET=Line1\n') 
     found4 = list_file.index('*ELEMENT, type=C3D4, ELSET=Volume1\n') 
 
-    comp1=list_file[found1+1:found4-1] 
+    comp1=list_file[found1+1:found2-1] 
     # comp2=list_file[found2+1:found4-1] 
 
     del list_file[found3:found4] 
