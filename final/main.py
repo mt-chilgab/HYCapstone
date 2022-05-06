@@ -868,10 +868,10 @@ def translatePrediction(pointsList, sampleValueVector, k):
 
     return resultValueList
 
-def printDVList():
+def printobjDVList():
     str_list = []
-    for i in range(math.floor(m)):
-        mapped_line = sampleList[i]
+    for i in range(len(sampleListObj)):
+        mapped_line = sampleListObj[i]
         str_line = []
         for j in range(ndv):
             str_line.append(format(mapped_line[j],'>15,.8E'))
@@ -879,13 +879,28 @@ def printDVList():
         str_list.append(str_line2)
     str_list[-1]=str_list[-1][:-1]
 
-    with open('dvList.txt','w',encoding='UTF-8') as f:
+    with open('objdvList.txt','w',encoding='UTF-8') as f:
+        for value in str_list:
+            f.write(value)
+
+def printconstrDVList():
+    str_list = []
+    for i in range(len(sampleListConstr)):
+        mapped_line = sampleListConstr[i]
+        str_line = []
+        for j in range(ndv):
+            str_line.append(format(mapped_line[j],'>15,.8E'))
+        str_line2 = ''.join(str_line)+'\n'
+        str_list.append(str_line2)
+    str_list[-1]=str_list[-1][:-1]
+
+    with open('constrdvList.txt','w',encoding='UTF-8') as f:
         for value in str_list:
             f.write(value)
 
 def printConstrList():
     str_list = []
-    for i in range(math.floor(m)):
+    for i in range(len(constraintFuncValue)):
         constr_line = constraintFuncValue[i]
         str_line = []
         str_line.append(format(constr_line,'>15,.8E'))
@@ -899,7 +914,7 @@ def printConstrList():
 
 def printObjList():
     str_list = []
-    for i in range(math.floor(m)):
+    for i in range(len(objectiveFuncValue)):
         obj_line = objectiveFuncValue[i]
         str_line = []
         str_line.append(format(obj_line,'>15,.8E'))
@@ -1038,7 +1053,7 @@ if __name__ == "__main__":
 
 
         # Design Variable Grouping
-        m = 10
+        m = 30
         ndv = 4
         includeEdge = 0
         bPoint1 = DVGroup(["BezierPoint1"],0,70,m,includeEdge)
@@ -1268,9 +1283,9 @@ if __name__ == "__main__":
             return sampleList, funcValue, krig
        
         print("\nObjective function infill: \n")
-        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVGroupList, sampleListObjBeforeInfill, objectiveFuncValueBeforeInfill, 0, krigObj, 3, 1)
+        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVGroupList, sampleListObjBeforeInfill, objectiveFuncValueBeforeInfill, 0, krigObj, 10, 1)
         print("\nConstraint function infill: \n")
-        sampleListConstr, constraintFuncValue, krigConstr = doInfill(DVGroupList, sampleListConstrBeforeInfill, constraintFuncValueBeforeInfill, 1, krigConstr, 3, 1)
+        sampleListConstr, constraintFuncValue, krigConstr = doInfill(DVGroupList, sampleListConstrBeforeInfill, constraintFuncValueBeforeInfill, 1, krigConstr, 10, 1)
     
 
         # Print the result and result assessment
@@ -1287,7 +1302,10 @@ if __name__ == "__main__":
         print("\n\nConstraint function values estimated with Kriging: \n"+str(predictedConstraintResult))
         print("\n\nConstr. func. R^2 = "+str(krigConstr.rsquared(np.array(constraintFuncValue), np.array(predictedConstraintResult))))
 
-        printDVList()
+
+
+        printobjDVList()
+        printconstrDVList()
         printObjList()
         printConstrList()
         matlabObjective()
