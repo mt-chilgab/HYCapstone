@@ -861,6 +861,12 @@ if __name__ == "__main__":
         #print("!"+postprocSTDOUT+"\n!!"+postprocSTDERR)
         print("Done postprocessing") 
 
+        objectiveFuncValue = FreeCAD.ActiveDocument.Fusion.Shape.Volume/np.power(10, 6)
+        constraintFuncValue = float(postprocSTDOUT.decode('UTF-8').strip('\r\n'))/100
+
+        print(fg.green+"Objective function value (dm^3): "+str(objectiveFuncValue)+fg.rs)
+        print(fg.green+"Constraint function value : "+str(constraintFuncValue)+"x 100MPa"+"\n\n"+fg.rs)
+
     except Exception as e:
         logging.info(e)
 
