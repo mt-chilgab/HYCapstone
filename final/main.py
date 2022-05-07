@@ -670,23 +670,13 @@ class Hub:
         obj.Shape = HubSolid
 
 
-
-class DVGroup:
+class DV:
     def __init__(self, nameList, domainLB, domainUB, ptsNum, includeEdge):
         self.nameList = nameList
-        self.propNumbers = len(self.nameList)
-
         self.domainLB = domainLB
         self.domainUB = domainUB
         self.scalingFactor = self.domainUB-self.domainLB
-        self.interval = self.scalingFactor/ptsNum
-        
-        # Compatibility with pyKriging domain edge setting (samplingplan.py -> rls)
-        self.domain = np.arange(self.domainLB+abs(includeEdge-1)*self.interval/2, self.domainUB-abs(includeEdge-1)*self.interval/2, self.interval) 
-        self.domainNormalized = np.arange(abs(includeEdge-1)*0.5/ptsNum, 1-abs(includeEdge-1)*0.5/ptsNum, 1/ptsNum)
-
-        self.currentIndex = 0
-        self.indexList = list(range(0, ptsNum, 1))
+        self.interval = self.scalingFactor/ptsNum 
     
     def bindValue(self, value):
         value = float(value)
@@ -960,15 +950,15 @@ def matlabConstraint():
             f.write(line)
         f.close
 
-# Plots Kriging prediction in 3D surface plot. Select two design variables from DVGroupList with dvIndex1, dvIndex2
+# Plots Kriging prediction in 3D surface plot. Select two design variables from DVList with dvIndex1, dvIndex2
 # and then assign values for another design variables with anotherDVs
-def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, funcName, div, sampleValueVector, k):
+def plotPrediction(DVList, dvIndex1, dvIndex2, anotherDVs, funcName, div, sampleValueVector, k):
     if dvIndex1 > dvIndex2:
         dvIndex1, dvIndex2 = dvIndex2, dvIndex1
 
-    if len(anotherDVs)+2 == len(DVGroupList):
-        dv1 = np.linspace(DVGroupList[dvIndex1].domainLB, DVGroupList[dvIndex1].domainUB, div).tolist()
-        dv2 = np.linspace(DVGroupList[dvIndex2].domainLB, DVGroupList[dvIndex2].domainUB, div).tolist()
+    if len(anotherDVs)+2 == len(DVList):
+        dv1 = np.linspace(DVList[dvIndex1].domainLB, DVList[dvIndex1].domainUB, div).tolist()
+        dv2 = np.linspace(DVList[dvIndex2].domainLB, DVList[dvIndex2].domainUB, div).tolist()
         
         ptsList = list(it.product(dv1, dv2))
         if len(anotherDVs) > 0:
@@ -1011,7 +1001,6 @@ def plotPrediction(DVGroupList, dvIndex1, dvIndex2, anotherDVs, funcName, div, s
 
 
 if __name__ == "__main__":
-
     FCPath = #@FCPath Placeholder
 
     try:
@@ -1056,14 +1045,14 @@ if __name__ == "__main__":
         m = 30
         ndv = 4
         includeEdge = 0
-        bPoint1 = DVGroup(["BezierPoint1"],0,70,m,includeEdge)
-        bPoint2 = DVGroup(["BezierPoint2"],-70,60,m,includeEdge)
-        bPoint3 = DVGroup(["BezierPoint3"],-40,40,m,includeEdge)
-        bPoint4 = DVGroup(["BezierPoint4"],-10,30,m,includeEdge)
+        bPoint1 = DV(["BezierPoint1"],0,70,m,includeEdge)
+        bPoint2 = DV(["BezierPoint2"],-70,60,m,includeEdge)
+        bPoint3 = DV(["BezierPoint3"],-40,40,m,includeEdge)
+        bPoint4 = DV(["BezierPoint4"],-10,30,m,includeEdge)
 
-        DVGroupList = [bPoint1,bPoint2,bPoint3,bPoint4]
-        if len(DVGroupList) != ndv:
-            print("DVGroupList length is not equal to given number of design variables")
+        DVList = [bPoint1,bPoint2,bPoint3,bPoint4]
+        if len(DVList) != ndv:
+            print("DVList length is not equal to given number of design variables")
             exit()
 
 
@@ -1075,19 +1064,19 @@ if __name__ == "__main__":
 
 
         # Revert the normalized sample list to original domain
-        def denormalizePtsList(DVGroupList, normalizedSampleList):
+        def denormalizePtsList(DVList, normalizedSampleList):
             normalizedSampleList = normalizedSampleList.tolist()
-            sampleList = np.zeros((len(normalizedSampleList), len(DVGroupList)))
+            sampleList = np.zeros((len(normalizedSampleList), len(DVList)))
             for i in range(len(normalizedSampleList)):
-                sampleList[i] = list(map(lambda x: x.domainLB+x.scalingFactor*normalizedSampleList[i][DVGroupList.index(x)], DVGroupList))
+                sampleList[i] = list(map(lambda x: x.domainLB+x.scalingFactor*normalizedSampleList[i][DVList.index(x)], DVList))
        
             return sampleList.tolist()
         
-        sampleList = denormalizePtsList(DVGroupList, normalizedSampleList)
+        sampleList = denormalizePtsList(DVList, normalizedSampleList)
         print("\nOptimal LHS Result:\n", sampleList)
 
         # Experiment with points calculated from OLHS
-        def experiment(DVGroupList, denormalizedSampleList, expNum=None):
+        def experiment(DVList, denormalizedSampleList, expNum=None):
             objectiveFuncValue = []
             constraintFuncValue = []
             
@@ -1100,8 +1089,8 @@ if __name__ == "__main__":
                     print(fg.red+"Experiment #"+str(expNum)+fg.rs)
                     print("Binding value for experiment #"+str(expNum))
                
-                for i in range(len(DVGroupList)):
-                    DVGroupList[i].bindValue(exp[i])  
+                for i in range(len(DVList)):
+                    DVList[i].bindValue(exp[i])  
                     
                 for obj in FreeCAD.ActiveDocument.Objects:
                     obj.touch()
@@ -1152,7 +1141,7 @@ if __name__ == "__main__":
 
             return objectiveFuncValue, constraintFuncValue
 
-        objectiveFuncValue, constraintFuncValue = experiment(DVGroupList, sampleList)
+        objectiveFuncValue, constraintFuncValue = experiment(DVList, sampleList)
 
 
         # Outlier Detection with MCD
@@ -1194,7 +1183,7 @@ if __name__ == "__main__":
             
 
         # Redo experiments on detected outlier points
-        def verifyOutliers(DVGroupList, sampleList, funcIndex, funcValue, outlierMask, expRep):
+        def verifyOutliers(DVList, sampleList, funcIndex, funcValue, outlierMask, expRep):
             testObservations = []
             outlierMask = outlierMask.tolist()
 
@@ -1204,7 +1193,7 @@ if __name__ == "__main__":
                         print("Re-doing experiment for detected outlier point: ", sampleList[i])
 
                         for j in range(expRep):
-                            testObservations.append(*experiment(DVGroupList, [sampleList[i]], j+1)[funcIndex])
+                            testObservations.append(*experiment(DVList, [sampleList[i]], j+1)[funcIndex])
                         testObservations = np.array(testObservations)
                         print("Initial checkup observations: ", testObservations)
                         
@@ -1230,10 +1219,10 @@ if __name__ == "__main__":
             return outlierMask
         
         outlierMaskObj = detectOutliersMCD(sampleList, objectiveFuncValue)
-        outlierMaskObj = verifyOutliers(DVGroupList, sampleList, 0, objectiveFuncValue, outlierMaskObj, 3)
+        outlierMaskObj = verifyOutliers(DVList, sampleList, 0, objectiveFuncValue, outlierMaskObj, 3)
 
         outlierMaskConstr = detectOutliersMCD(sampleList, constraintFuncValue)
-        outlierMaskConstr = verifyOutliers(DVGroupList, sampleList, 1, constraintFuncValue, outlierMaskConstr, 3)
+        outlierMaskConstr = verifyOutliers(DVList, sampleList, 1, constraintFuncValue, outlierMaskConstr, 3)
         
         print("Rearranged outlier mask of objective func.: ", outlierMaskObj)
         print("Rearranged outlier mask of constraint func.: ", outlierMaskConstr)
@@ -1254,7 +1243,7 @@ if __name__ == "__main__":
 
         # Infill points for Kriging + outlier detection with MCD
         
-        def doInfill(DVGroupList, sampleList, funcValue, funcIndex, krig, infillRep, infillNum):
+        def doInfill(DVList, sampleList, funcValue, funcIndex, krig, infillRep, infillNum):
             print("\nExperiments for Infill Points: ")
             for i in range(infillRep):
                 # infill criteria are either 'ei' (expected improvement) or 'error' (point of biggest error)
@@ -1264,9 +1253,9 @@ if __name__ == "__main__":
                 sampleNumBeforehand = len(sampleList)
                 sampleList += newPts
                 for j in range(len(newPts)):
-                    funcValue.append(*experiment(DVGroupList, [newPts[j]], infillNum*i+j+1)[funcIndex])
+                    funcValue.append(*experiment(DVList, [newPts[j]], infillNum*i+j+1)[funcIndex])
 
-                outlierMask = verifyOutliers(DVGroupList, sampleList, funcIndex, funcValue, detectOutliersMCD(sampleList, funcValue, infill=True, samplePtsBeforeInfill=sampleNumBeforehand), 5)
+                outlierMask = verifyOutliers(DVList, sampleList, funcIndex, funcValue, detectOutliersMCD(sampleList, funcValue, infill=True, samplePtsBeforeInfill=sampleNumBeforehand), 5)
                 sampleList, funcValue = np.array(sampleList)[np.array(outlierMask)].tolist(), np.array(funcValue)[np.array(outlierMask)].tolist()
                 
                 print("outlier removed: ", sampleList, funcValue) 
@@ -1283,9 +1272,9 @@ if __name__ == "__main__":
             return sampleList, funcValue, krig
        
         print("\nObjective function infill: \n")
-        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVGroupList, sampleListObjBeforeInfill, objectiveFuncValueBeforeInfill, 0, krigObj, 10, 1)
+        sampleListObj, objectiveFuncValue, krigObj = doInfill(DVList, sampleListObjBeforeInfill, objectiveFuncValueBeforeInfill, 0, krigObj, 10, 1)
         print("\nConstraint function infill: \n")
-        sampleListConstr, constraintFuncValue, krigConstr = doInfill(DVGroupList, sampleListConstrBeforeInfill, constraintFuncValueBeforeInfill, 1, krigConstr, 10, 1)
+        sampleListConstr, constraintFuncValue, krigConstr = doInfill(DVList, sampleListConstrBeforeInfill, constraintFuncValueBeforeInfill, 1, krigConstr, 10, 1)
     
 
         # Print the result and result assessment
@@ -1310,8 +1299,8 @@ if __name__ == "__main__":
         printConstrList()
         matlabObjective()
         matlabConstraint()
-        plotPrediction(DVGroupList, 1, 2, [70], "Volume", 100, np.array(objectiveFuncValue), krigObj)
-        plotPrediction(DVGroupList, 1, 2, [70], "maxVonMises", 100, np.array(constraintFuncValue), krigConstr)
+        plotPrediction(DVList, 1, 2, [70], "Volume", 100, np.array(objectiveFuncValue), krigObj)
+        plotPrediction(DVList, 1, 2, [70], "maxVonMises", 100, np.array(constraintFuncValue), krigConstr)
 
     except Exception as e:
         logging.info(e)
